@@ -18,7 +18,7 @@ export default function ArrowEscapeRoundResultScreen({
     <div className="screen feedback-screen ae-round-result">
       <div className="game-header">
         <button className="home-btn" onClick={onHome}>← Home</button>
-        <span className="round-indicator">Round {roundIndex + 1} of 5</span>
+        <span className="round-indicator">Round {roundIndex + 1} of 3</span>
       </div>
 
       <p className="ae-rr-board-name">{boardName}</p>

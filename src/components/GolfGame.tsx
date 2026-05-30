@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { GolfRoundResult } from '../types';
 import { golfCourses }           from '../data/golfCourses';
+import { useBackgroundMusic }    from '../hooks/useBackgroundMusic';
 import GolfIntroScreen            from './GolfIntroScreen';
 import GolfGameScreen             from './GolfGameScreen';
 import GolfRoundCompleteScreen    from './GolfRoundCompleteScreen';
@@ -21,6 +22,7 @@ function pickRandom<T>(arr: T[], n: number): T[] {
 }
 
 export default function GolfGame({ playerName, onExit, roomContext }: Props) {
+  const { setTrack }           = useBackgroundMusic();
   const [screen,       setScreen]       = useState<GolfScreen>('intro');
   const [selected,     setSelected]     = useState(() => pickRandom(golfCourses, 5));
   const [currentRound, setCurrentRound] = useState(0);   // 0–4
@@ -31,6 +33,7 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
   // ── Transitions ───────────────────────────────────────────────────────────
 
   function handleStart() {
+    setTrack('golf');
     setSelected(pickRandom(golfCourses, 5));
     setCurrentRound(0);
     setRoundResults([]);
@@ -61,11 +64,17 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
   }
 
   function handlePlayAgain() {
+    setTrack('golf');
     setSelected(pickRandom(golfCourses, 5));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);
     setScreen('playing');
+  }
+
+  function handleExit() {
+    setTrack('main');
+    onExit();
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -75,7 +84,7 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
       {screen === 'intro' && (
         <GolfIntroScreen
           onStart={handleStart}
-          onBack={onExit}
+          onBack={handleExit}
         />
       )}
 

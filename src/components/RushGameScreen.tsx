@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GAME_DURATION = 30; // seconds
+const BASE_DURATION  = 30; // seconds
+const BONUS_DURATION = 35; // seconds — granted when score > 100 at the 30 s mark
 
 // ── Difficulty helpers ────────────────────────────────────────────────────────
 
@@ -11,17 +12,17 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Four-phase symbol lifetime ramp (harder curve).
- *  0 – 10 s  →  1100 ms → 900 ms
- * 10 – 20 s  →   900 ms → 720 ms
- * 20 – 25 s  →   720 ms → 600 ms
- * 25 – 30 s  →   600 ms → 500 ms  (floor 480 ms)
+ * Four-phase symbol lifetime ramp — harder than before (~15-20 % shorter).
+ *  0 – 10 s  →   950 ms → 780 ms  (was 1100→900)
+ * 10 – 20 s  →   780 ms → 620 ms  (was  900→720)
+ * 20 – 25 s  →   620 ms → 500 ms  (was  720→600)
+ * 25 – 30 s  →   500 ms → 420 ms  (floor 400 ms)  (was 600→500, floor 480)
  */
 function getLifetime(elapsed: number): number {
-  if (elapsed <= 10) return Math.round(lerp(1100, 900, elapsed / 10));
-  if (elapsed <= 20) return Math.round(lerp(900,  720, (elapsed - 10) / 10));
-  if (elapsed <= 25) return Math.round(lerp(720,  600, (elapsed - 20) / 5));
-  return Math.max(480, Math.round(lerp(600, 500, (elapsed - 25) / 5)));
+  if (elapsed <= 10) return Math.round(lerp(950, 780, elapsed / 10));
+  if (elapsed <= 20) return Math.round(lerp(780, 620, (elapsed - 10) / 10));
+  if (elapsed <= 25) return Math.round(lerp(620, 500, (elapsed - 20) / 5));
+  return Math.max(400, Math.round(lerp(500, 420, (elapsed - 25) / 5)));
 }
 
 /**
@@ -230,6 +231,65 @@ function BonusGrannySVG() {
   );
 }
 
+// ── KRONE bonus coin type ─────────────────────────────────────────────────────
+
+interface KroneBonusState {
+  id:   number;
+  left: number;
+  top:  number;
+}
+
+// Gold coin with engraved KRONE — appears briefly every 10 s, worth +8
+function KroneBonusSVG() {
+  return (
+    <svg
+      viewBox="-32 -32 64 64"
+      width="64"
+      height="64"
+      style={{ display: 'block', overflow: 'visible' }}
+      aria-hidden="true"
+    >
+      {/* Shadow */}
+      <ellipse cx="2" cy="30" rx="22" ry="5" fill="rgba(0,0,0,0.32)" />
+      {/* Outer coin ring */}
+      <circle cx="0" cy="0" r="30" fill="#B8860B" />
+      <circle cx="0" cy="0" r="30" fill="none" stroke="rgba(255,215,0,0.60)" strokeWidth="2" />
+      {/* Mid gold fill */}
+      <circle cx="0" cy="0" r="27" fill="#DAA520" />
+      {/* Inner lighter ring */}
+      <circle cx="0" cy="0" r="24" fill="#FFD700" />
+      {/* Top shine arc */}
+      <path d="M-18,-18 Q0,-26 18,-18" fill="none" stroke="rgba(255,255,220,0.60)" strokeWidth="3.5" strokeLinecap="round" />
+      {/* Crown icon */}
+      <path d="M-11,-7 L-14,4 L0,0 L14,4 L11,-7 L7,-3 L0,-9 L-7,-3 Z"
+        fill="rgba(180,120,0,0.90)" stroke="rgba(140,80,0,0.60)" strokeWidth="0.8" />
+      {/* KRONE text */}
+      <text x="0" y="16" textAnchor="middle"
+        fontSize="8" fontWeight="900"
+        fill="rgba(110,60,0,0.92)"
+        letterSpacing="0.8"
+        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+      >KRONE</text>
+      {/* +8 badge */}
+      <circle cx="18" cy="-18" r="9" fill="#FF453A" />
+      <text x="18" y="-14" textAnchor="middle"
+        fontSize="7.5" fontWeight="900" fill="#ffffff"
+        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+      >+8</text>
+    </svg>
+  );
+}
+
+// ── Falling ticket type ───────────────────────────────────────────────────────
+
+interface FallingTicket {
+  id:       number;
+  left:     number;   // viewport px
+  delay:    number;   // animation-delay in ms
+  duration: number;   // fall duration in ms
+  rotate:   number;   // initial CSS rotation deg
+}
+
 // ── Symbol type ───────────────────────────────────────────────────────────────
 
 interface SymbolState {
@@ -308,7 +368,7 @@ interface Props {
 export default function RushGameScreen({ onComplete, onHome }: Props) {
   const [sym,             setSym]             = useState<SymbolState | null>(null);
   const [score,           setScore]           = useState(0);
-  const [timeLeft,        setTimeLeft]        = useState(GAME_DURATION);
+  const [timeLeft,        setTimeLeft]        = useState(BASE_DURATION);
   const [pops,            setPops]            = useState<PopItem[]>([]);
   const [projectiles,     setProjectiles]     = useState<ProjectileState[]>([]);
   const [hits,            setHits]            = useState<HitEffect[]>([]);
@@ -317,6 +377,11 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   const [bonusPops,       setBonusPops]       = useState<{ id: number; cx: number; ty: number }[]>([]);
   const [bonusGranny,     setBonusGranny]     = useState<BonusGrannyState | null>(null);
   const [grannyPops,      setGrannyPops]      = useState<{ id: number; cx: number; ty: number }[]>([]);
+  // ── KRONE bonus coin ──────────────────────────────────────────────────────
+  const [kroneBonus,      setKroneBonus]      = useState<KroneBonusState | null>(null);
+  const [kronePops,       setKronePops]       = useState<{ id: number; cx: number; ty: number }[]>([]);
+  // ── Falling tickets (shower from t=20 s) ─────────────────────────────────
+  const [tickets,         setTickets]         = useState<FallingTicket[]>([]);
 
   // ── Scoring refs (no stale closures) ──────────────────────────────────────
   const scoreRef          = useRef<number>(0);
@@ -333,6 +398,11 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   const onCompleteRef      = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
+  // ── Extra time (bonus +5 s when score > 100 at 30 s) ──────────────────────
+  const extraTimeGrantedRef  = useRef<boolean>(false);
+  const [showBonusBanner, setShowBonusBanner] = useState(false);
+  const [bonusTimeActive, setBonusTimeActive] = useState(false);
+
   // ── Bonus chaser refs ──────────────────────────────────────────────────────
   const bonusChaserRef      = useRef<BonusChaserState | null>(null);
   const bonusSpawnTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -344,12 +414,20 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   const grannySpawnTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const grannyExpireTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── KRONE coin refs ────────────────────────────────────────────────────────
+  const kroneBonusRef         = useRef<KroneBonusState | null>(null);
+  const kroneExpireTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Falling ticket refs ────────────────────────────────────────────────────
+  const ticketIntervalRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ── Bonus chaser helpers ──────────────────────────────────────────────────
 
   function scheduleNextBonus() {
     if (doneRef.current) return;
-    const elapsed  = (performance.now() - gameStartRef.current) / 1000;
-    const tl       = GAME_DURATION - elapsed;
+    const elapsed      = (performance.now() - gameStartRef.current) / 1000;
+    const effectiveDur = extraTimeGrantedRef.current ? BONUS_DURATION : BASE_DURATION;
+    const tl           = effectiveDur - elapsed;
     if (tl <= 0) return;
 
     const isFinal  = tl <= 10;
@@ -362,8 +440,9 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
 
   function spawnBonus() {
     if (doneRef.current) return;
-    const elapsed = (performance.now() - gameStartRef.current) / 1000;
-    const isFinal = GAME_DURATION - elapsed <= 10;
+    const elapsed      = (performance.now() - gameStartRef.current) / 1000;
+    const effectiveDur = extraTimeGrantedRef.current ? BONUS_DURATION : BASE_DURATION;
+    const isFinal      = effectiveDur - elapsed <= 10;
 
     const W    = Math.max(320, window.innerWidth);
     const H    = Math.max(500, window.innerHeight);
@@ -464,6 +543,76 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
     setBonusGranny(null);
   }
 
+  // ── KRONE coin helpers ────────────────────────────────────────────────────
+
+  function spawnKroneBonus() {
+    if (doneRef.current) return;
+    const W    = Math.max(320, window.innerWidth);
+    const H    = Math.max(500, window.innerHeight);
+    const size = 64;
+    const left = 24 + Math.random() * Math.max(0, W - size - 48);
+    const top  = 120 + Math.random() * Math.max(0, H - size - 220);
+    const kb: KroneBonusState = { id: performance.now() + Math.random(), left, top };
+    kroneBonusRef.current = kb;
+    setKroneBonus(kb);
+    if (kroneExpireTimerRef.current) clearTimeout(kroneExpireTimerRef.current);
+    kroneExpireTimerRef.current = setTimeout(() => {
+      if (kroneBonusRef.current?.id === kb.id) {
+        kroneBonusRef.current = null;
+        setKroneBonus(null);
+      }
+    }, 1800);
+  }
+
+  function handleKroneTap(e: React.PointerEvent) {
+    e.stopPropagation();
+    if (doneRef.current || !kroneBonusRef.current) return;
+    const kb  = kroneBonusRef.current;
+    const pts = 8;
+    bonusPointsRef.current += pts;
+    const newScore = scoreRef.current + pts;
+    scoreRef.current = newScore;
+    setScore(newScore);
+    setKronePops(ps => [...ps.slice(-4), {
+      id: performance.now() + Math.random(),
+      cx: kb.left + 32,
+      ty: kb.top - 10,
+    }]);
+    if (kroneExpireTimerRef.current) clearTimeout(kroneExpireTimerRef.current);
+    kroneBonusRef.current = null;
+    setKroneBonus(null);
+  }
+
+  // ── Ticket shower helpers ──────────────────────────────────────────────────
+
+  function startTicketShower() {
+    if (ticketIntervalRef.current) return;
+    // Spawn a burst of 6 tickets immediately, then one every ~600 ms
+    function spawnBatch(count: number) {
+      if (doneRef.current) return;
+      const W = Math.max(320, window.innerWidth);
+      setTickets(prev => {
+        const kept = prev.slice(-24);
+        const newOnes: FallingTicket[] = Array.from({ length: count }, () => ({
+          id:       performance.now() + Math.random(),
+          left:     16 + Math.random() * Math.max(0, W - 80),
+          delay:    Math.random() * 300,
+          duration: 1200 + Math.random() * 600,
+          rotate:   (Math.random() - 0.5) * 40,
+        }));
+        return [...kept, ...newOnes];
+      });
+    }
+    spawnBatch(6);
+    ticketIntervalRef.current = setInterval(() => {
+      if (doneRef.current) {
+        if (ticketIntervalRef.current) clearInterval(ticketIntervalRef.current);
+        return;
+      }
+      spawnBatch(2);
+    }, 600);
+  }
+
   // ── Game loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
     gameStartRef.current = performance.now();
@@ -474,7 +623,19 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
     function tick() {
       const now     = performance.now();
       const elapsed = (now - gameStartRef.current) / 1000;
-      const tl      = Math.max(0, GAME_DURATION - elapsed);
+
+      // ── Grant bonus time once at 30 s if score > 100 ──────────────────────
+      if (!extraTimeGrantedRef.current && !doneRef.current && elapsed >= BASE_DURATION) {
+        if (scoreRef.current > 100) {
+          extraTimeGrantedRef.current = true;
+          setBonusTimeActive(true);
+          setShowBonusBanner(true);
+          setTimeout(() => setShowBonusBanner(false), 2400);
+        }
+      }
+
+      const effectiveDur = extraTimeGrantedRef.current ? BONUS_DURATION : BASE_DURATION;
+      const tl           = Math.max(0, effectiveDur - elapsed);
 
       setTimeLeft(tl);
 
@@ -484,7 +645,7 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
         setTimeout(() => setShowFinalBanner(false), 1600);
       }
 
-      if (elapsed >= GAME_DURATION) {
+      if (elapsed >= effectiveDur) {
         if (!doneRef.current) {
           doneRef.current = true;
           setSym(null);
@@ -496,6 +657,9 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
           setBonusChaser(null);
           bonusGrannyRef.current = null;
           setBonusGranny(null);
+          kroneBonusRef.current = null;
+          setKroneBonus(null);
+          if (ticketIntervalRef.current) clearInterval(ticketIntervalRef.current);
           onCompleteRef.current(
             scoreRef.current,
             normalHitsRef.current,
@@ -526,12 +690,24 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
     const grannyDelay = (8 + Math.random() * 14) * 1000;
     grannySpawnTimerRef.current = setTimeout(spawnGranny, grannyDelay);
 
+    // KRONE coin at t=10 s and t=20 s (slight jitter so it doesn't clash with chaser)
+    const krone1Timer = setTimeout(spawnKroneBonus, 10_000 + Math.random() * 400);
+    const krone2Timer = setTimeout(spawnKroneBonus, 20_000 + Math.random() * 400);
+
+    // Falling ticket shower from t=20 s
+    const ticketTimer = setTimeout(startTicketShower, 20_000);
+
     return () => {
       cancelAnimationFrame(rafRef.current);
       if (bonusSpawnTimerRef.current)  clearTimeout(bonusSpawnTimerRef.current);
       if (bonusExpireTimerRef.current) clearTimeout(bonusExpireTimerRef.current);
       if (grannySpawnTimerRef.current) clearTimeout(grannySpawnTimerRef.current);
       if (grannyExpireTimerRef.current) clearTimeout(grannyExpireTimerRef.current);
+      if (kroneExpireTimerRef.current) clearTimeout(kroneExpireTimerRef.current);
+      if (ticketIntervalRef.current)   clearInterval(ticketIntervalRef.current);
+      clearTimeout(krone1Timer);
+      clearTimeout(krone2Timer);
+      clearTimeout(ticketTimer);
     };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -541,9 +717,10 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
     if (doneRef.current || !symRef.current) return;
 
     const prev    = symRef.current;
-    const elapsed = (performance.now() - gameStartRef.current) / 1000;
-    const isFinal = (GAME_DURATION - elapsed) <= 10;
-    const pts     = isFinal ? 2 : 1;
+    const elapsed      = (performance.now() - gameStartRef.current) / 1000;
+    const effectiveDur = extraTimeGrantedRef.current ? BONUS_DURATION : BASE_DURATION;
+    const isFinal      = (effectiveDur - elapsed) <= 10;
+    const pts          = isFinal ? 2 : 1;
 
     if (isFinal) {
       finalRushHitsRef.current++;
@@ -597,8 +774,9 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   const isFinal10  = timeLeft <= 10 && timeLeft > 0;
 
   const timerClass =
-    isCritical    ? 'rush-timer rush-timer--critical' :
-    timeLeft <= 8 ? 'rush-timer rush-timer--urgent'   :
+    bonusTimeActive ? 'rush-timer rush-timer--bonus'    :
+    isCritical      ? 'rush-timer rush-timer--critical' :
+    timeLeft <= 8   ? 'rush-timer rush-timer--urgent'   :
     'rush-timer';
 
   const wrapClass = [
@@ -636,6 +814,14 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
       {showFinalBanner && (
         <div className="rush-final-rush-banner" aria-live="assertive">
           FINAL RUSH
+        </div>
+      )}
+
+      {/* ── Bonus Time +5s banner ─────────────────────────────────────────── */}
+      {showBonusBanner && (
+        <div className="rush-bonus-time-banner" aria-live="assertive">
+          <span className="rush-bonus-time-icon">+5s</span>
+          <span className="rush-bonus-time-label">Bonus Time!</span>
         </div>
       )}
 
@@ -758,6 +944,49 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
           onAnimationEnd={() => setGrannyPops(ps => ps.filter(p => p.id !== pop.id))}
         >
           +8
+        </div>
+      ))}
+
+      {/* ── KRONE bonus coin (every 10 s) ─────────────────────────────────── */}
+      {kroneBonus && (
+        <div
+          key={kroneBonus.id}
+          className="rush-krone-bonus"
+          style={{ position: 'absolute', left: `${kroneBonus.left}px`, top: `${kroneBonus.top}px` }}
+          onPointerDown={handleKroneTap}
+          role="button"
+          aria-label="KRONE bonus — tap for +8"
+        >
+          <KroneBonusSVG />
+        </div>
+      )}
+
+      {/* ── +8 KRONE pops ─────────────────────────────────────────────────── */}
+      {kronePops.map(pop => (
+        <div
+          key={pop.id}
+          className="rush-pop rush-pop--krone"
+          style={{ left: `${pop.cx}px`, top: `${pop.ty}px` }}
+          onAnimationEnd={() => setKronePops(ps => ps.filter(p => p.id !== pop.id))}
+        >
+          +8
+        </div>
+      ))}
+
+      {/* ── Falling krone tickets (from t=20 s) ───────────────────────────── */}
+      {tickets.map(tk => (
+        <div
+          key={tk.id}
+          className="rush-ticket"
+          style={{
+            left:                    `${tk.left}px`,
+            animationDelay:          `${tk.delay}ms`,
+            animationDuration:       `${tk.duration}ms`,
+            '--tk-rotate':           `${tk.rotate}deg`,
+          } as React.CSSProperties}
+          onAnimationEnd={() => setTickets(prev => prev.filter(t => t.id !== tk.id))}
+        >
+          krone
         </div>
       ))}
 

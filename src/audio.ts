@@ -18,7 +18,7 @@
  *   musicManager.subscribe(fn)         — listen for enabled changes
  */
 
-export type TrackKey = 'main' | 'rush' | 'grandma';
+export type TrackKey = 'main' | 'rush' | 'grandma' | 'golf';
 
 const STORAGE_KEY = 'innerclock_music_on';
 
@@ -27,9 +27,10 @@ const TRACKS: Record<TrackKey, string[]> = {
   main:    ['/audio/background-loop.mp3', '/audio/background-loop.ogg'],
   rush:    ['/audio/rush-loop.mp3',       '/audio/background-loop.mp3'],
   grandma: ['/audio/grandma-walk.mp3',   '/audio/grandma%20walk.mp3', '/audio/background-loop.mp3'],
+  golf:    ['/audio/golf.mp3',            '/audio/background-loop.mp3'],
 };
 
-const DEFAULT_VOLUME = 0.20;
+const DEFAULT_VOLUME = 0.35;
 const FADE_STEPS     = 20;
 const FADE_INTERVAL  = 18;  // ms per step → ~360 ms total fade
 

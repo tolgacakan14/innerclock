@@ -10,10 +10,14 @@ type ModeFilter =
   | 'Rush Mode'
   | 'Golf Mode'
   | 'Grandma Walking'
-  | 'Arrow Escape';
+  | 'Arrow Escape'
+  | 'Sequence Tap'
+  | 'Memory Grid'
+  | 'Tap Timing';
 
 const FILTERS: ModeFilter[] = [
-  'All', 'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode', 'Grandma Walking', 'Arrow Escape',
+  'All', 'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode',
+  'Grandma Walking', 'Arrow Escape', 'Sequence Tap', 'Memory Grid', 'Tap Timing',
 ];
 
 const FILTER_SHORT: Record<ModeFilter, string> = {
@@ -24,6 +28,9 @@ const FILTER_SHORT: Record<ModeFilter, string> = {
   'Golf Mode':       'Golf',
   'Grandma Walking': 'Grandma',
   'Arrow Escape':    'Arrow',
+  'Sequence Tap':    'Sequence',
+  'Memory Grid':     'Memory',
+  'Tap Timing':      'Timing',
 };
 
 // Sort scores: lower_is_better asc, higher_is_better desc
@@ -163,19 +170,21 @@ export default function RoomScoreboardScreen() {
         </button>
       </div>
 
-      {/* Mode tabs */}
-      <div className="sb-tabs" role="tablist">
-        {FILTERS.map(f => (
-          <button
-            key={f}
-            role="tab"
-            aria-selected={filter === f}
-            className={`sb-tab${filter === f ? ' sb-tab--active' : ''}`}
-            onClick={() => setFilter(f)}
-          >
-            {FILTER_SHORT[f]}
-          </button>
-        ))}
+      {/* Mode tabs — horizontally scrollable on mobile */}
+      <div className="sb-tabs-wrap">
+        <div className="sb-tabs" role="tablist">
+          {FILTERS.map(f => (
+            <button
+              key={f}
+              role="tab"
+              aria-selected={filter === f}
+              className={`sb-tab${filter === f ? ' sb-tab--active' : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {FILTER_SHORT[f]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}

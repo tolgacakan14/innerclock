@@ -1209,16 +1209,27 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   const [countdownActive, setCountdownActive] = useState(true);
   const [levelBanner,     setLevelBanner]     = useState<LevelName | null>(null);
   const [virginMode,      setVirginMode]      = useState(false);
-  const [showRotateHint,  setShowRotateHint]  = useState(false);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Portrait hint ─────────────────────────────────────────────────────────
+  // ── Portrait / orientation support ───────────────────────────────────────
+  function calcOrient() {
+    const isP  = window.innerWidth < window.innerHeight;
+    const scl  = isP
+      ? Math.min(window.innerWidth / CH, (window.innerHeight - 56) / CW)
+      : 1;
+    return { isPortrait: isP, scale: scl };
+  }
+  const [orient, setOrient] = useState(calcOrient);
+  const { isPortrait, scale: portraitScale } = orient;
+
   useEffect(() => {
-    if (window.innerHeight > window.innerWidth) {
-      setShowRotateHint(true);
-      const t = setTimeout(() => setShowRotateHint(false), 2800);
-      return () => clearTimeout(t);
-    }
+    function update() { setOrient(calcOrient()); }
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
   }, []);
 
   // ── Countdown ─────────────────────────────────────────────────────────────
@@ -1525,22 +1536,36 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   }, []);
 
   // ── Touch zones ───────────────────────────────────────────────────────────
+  // Portrait: game rotated -90°, so bottom half of screen → JUMP, top half → CROUCH
+  // Landscape: left half → JUMP, right half → CROUCH
   function handleTouchStart(e: React.TouchEvent) {
     for (let i = 0; i < e.changedTouches.length; i++) {
-      const t    = e.changedTouches[i];
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      if (t.clientX - rect.left < rect.width / 2) {
-        jumpPressRef.current = true;
+      const t = e.changedTouches[i];
+      if (isPortrait) {
+        if (t.clientY >= window.innerHeight / 2) {
+          jumpPressRef.current = true;
+        } else {
+          crouchHeldRef.current = true;
+        }
       } else {
-        crouchHeldRef.current = true;
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        if (t.clientX - rect.left < rect.width / 2) {
+          jumpPressRef.current = true;
+        } else {
+          crouchHeldRef.current = true;
+        }
       }
     }
   }
   function handleTouchEnd(e: React.TouchEvent) {
     for (let i = 0; i < e.changedTouches.length; i++) {
-      const t    = e.changedTouches[i];
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      if (t.clientX - rect.left >= rect.width / 2) crouchHeldRef.current = false;
+      const t = e.changedTouches[i];
+      if (isPortrait) {
+        if (t.clientY < window.innerHeight / 2) crouchHeldRef.current = false;
+      } else {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        if (t.clientX - rect.left >= rect.width / 2) crouchHeldRef.current = false;
+      }
     }
   }
 
@@ -1561,12 +1586,23 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         >
           ← Home
         </button>
-        <span className="grandma-round-label">Round {roundIndex + 1} of 5</span>
+        <span className="grandma-round-label">Round {roundIndex + 1} of 3</span>
         <span className="grandma-score-live">{displayScore}</span>
       </div>
 
       {/* Canvas + overlays */}
-      <div className={`grandma-game-field${virginMode ? ' grandma-game-field--virgin' : ''}`} style={{ position: 'relative' }}>
+      <div
+        className={`grandma-game-field${virginMode ? ' grandma-game-field--virgin' : ''}${isPortrait ? ' grandma-game-field--portrait' : ''}`}
+        style={isPortrait ? {
+          position:        'absolute' as const,
+          top:             '50%',
+          left:            '50%',
+          width:           CW,
+          height:          CH,
+          transform:       `translate(-50%, -50%) rotate(-90deg) scale(${portraitScale})`,
+          transformOrigin: 'center center',
+        } : { position: 'relative' as const }}
+      >
         <canvas
           ref={canvasRef}
           className="grandma-game-canvas"
@@ -1592,12 +1628,6 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
           <div className="grandma-touch-zone grandma-touch-zone--jump">JUMP</div>
           <div className="grandma-touch-zone grandma-touch-zone--crouch">DUCK</div>
         </div>
-
-        {showRotateHint && (
-          <div className="grandma-rotate-hint" aria-live="polite">
-            ↔ Rotate phone for wider view
-          </div>
-        )}
       </div>
 
       {/* Countdown */}

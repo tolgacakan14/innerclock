@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import type { GolfCourse, GolfWall } from '../types';
 
+const RAD_TO_DEG = 180 / Math.PI;
+
 // ── Physics constants ─────────────────────────────────────────────────────────
 const VW         = 600;
 const VH         = 900;
@@ -106,10 +108,16 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  const [ballPos,    setBallPos]  = useState(course.ballStart);
-  const [shots,      setShots]    = useState(0);
-  const [phase,      setPhase]    = useState<Phase>('idle');
-  const [showKrone,  setShowKrone] = useState(false);
+  // ── Rolling state ─────────────────────────────────────────────────────────
+  const rollAngleRef   = useRef(0);
+  const prevBallPosRef = useRef({ x: course.ballStart.x, y: course.ballStart.y });
+
+  const [ballPos,    setBallPos]    = useState(course.ballStart);
+  const [rollAngle,  setRollAngle]  = useState(0);
+  const [shots,      setShots]      = useState(0);
+  const [phase,      setPhase]      = useState<Phase>('idle');
+  const [showKrone,  setShowKrone]  = useState(false);
+  const [aimScale,   setAimScale]   = useState(1);
 
   const aimCurrentRef = useRef<{ x: number; y: number } | null>(null);
   const [aimDisplay,  setAimDisplay] = useState<{ x: number; y: number } | null>(null);
@@ -168,7 +176,19 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
       }
 
       ballRef.current = { x, y, vx, vy };
+
+      // ── Rolling angle accumulation ─────────────────────────────────────────
+      const prev = prevBallPosRef.current;
+      const ddx  = x - prev.x, ddy = y - prev.y;
+      const dist = Math.hypot(ddx, ddy);
+      if (dist > 0.05) {
+        const sign = Math.abs(ddx) >= Math.abs(ddy) ? Math.sign(ddx) : Math.sign(ddy);
+        rollAngleRef.current += sign * (dist / BALL_R) * RAD_TO_DEG;
+        prevBallPosRef.current = { x, y };
+      }
+
       setBallPos({ x, y });
+      setRollAngle(rollAngleRef.current);
 
       const finalSpeed = Math.hypot(vx, vy);
       if (finalSpeed < 0.35) {
@@ -201,6 +221,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     if (Math.hypot(pt.x - b.x, pt.y - b.y) > BALL_TAP_R) return;
     phaseRef.current = 'aiming';
     setPhase('aiming');
+    setAimScale(0.86);
     aimCurrentRef.current = { x: b.x, y: b.y };
     setAimDisplay({ x: b.x, y: b.y });
     (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
@@ -215,6 +236,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   }
 
   function handlePointerUp() {
+    setAimScale(1);
     if (phaseRef.current !== 'aiming') return;
     const current = aimCurrentRef.current;
     const b = ballRef.current;
@@ -229,6 +251,8 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
     const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
     const speed = power * MAX_SPEED;
+    // Reset prev position before new shot
+    prevBallPosRef.current = { x: b.x, y: b.y };
     ballRef.current = { ...b, vx: (-dx / dist) * speed, vy: (-dy / dist) * speed };
 
     const newShots = shotsRef.current + 1;
@@ -264,7 +288,14 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
       </div>
 
       {/* ── SVG field ───────────────────────────────────────────────────────── */}
-      <div className="golf-game-field">
+      <div
+        className="golf-game-field"
+        style={{
+          transform: `scale(${aimScale})`,
+          transformOrigin: 'center center',
+          transition: aimScale < 1 ? 'transform 0.12s ease' : 'transform 0.32s ease',
+        }}
+      >
         <svg
           ref={svgRef}
           className="golf-game-svg"
@@ -371,28 +402,52 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
             <AimIndicator bx={ballPos.x} by={ballPos.y} ax={aimDisplay.x} ay={aimDisplay.y} />
           )}
 
-          {/* Ball */}
+          {/* Ball shadow — not rotating */}
           {phase !== 'sunk' && (
-            <>
-              <ellipse cx={ballPos.x + 2} cy={ballPos.y + 5}
-                rx={BALL_R * 0.85} ry={BALL_R * 0.40} fill="rgba(0,0,0,0.40)" />
+            <ellipse cx={ballPos.x + 2} cy={ballPos.y + 6}
+              rx={BALL_R * 0.90} ry={BALL_R * 0.38} fill="rgba(0,0,0,0.45)" />
+          )}
+
+          {/* Ball — rolling group */}
+          {phase !== 'sunk' && (
+            <g transform={`rotate(${rollAngle}, ${ballPos.x}, ${ballPos.y})`}>
+              {/* Base sphere */}
               <circle cx={ballPos.x} cy={ballPos.y} r={BALL_R}
-                fill="url(#ballGrad)"
-                stroke="rgba(255,255,255,0.30)" strokeWidth="1" />
-              {/* KRONE branding */}
+                fill="url(#ballGrad)" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+              {/* Seam arc — horizontal */}
+              <path
+                d={`M ${ballPos.x - BALL_R + 1} ${ballPos.y}
+                    Q ${ballPos.x} ${ballPos.y - BALL_R * 0.55}
+                      ${ballPos.x + BALL_R - 1} ${ballPos.y}
+                    Q ${ballPos.x} ${ballPos.y + BALL_R * 0.55}
+                      ${ballPos.x - BALL_R + 1} ${ballPos.y}`}
+                fill="none" stroke="rgba(50,45,90,0.38)" strokeWidth="1.4"
+                style={{ pointerEvents: 'none' }} />
+              {/* Seam arc — vertical */}
+              <path
+                d={`M ${ballPos.x} ${ballPos.y - BALL_R + 1}
+                    Q ${ballPos.x + BALL_R * 0.55} ${ballPos.y}
+                      ${ballPos.x} ${ballPos.y + BALL_R - 1}
+                    Q ${ballPos.x - BALL_R * 0.55} ${ballPos.y}
+                      ${ballPos.x} ${ballPos.y - BALL_R + 1}`}
+                fill="none" stroke="rgba(50,45,90,0.28)" strokeWidth="1.2"
+                style={{ pointerEvents: 'none' }} />
+              {/* KRONE mark — rotates visibly */}
               <text
-                x={ballPos.x}
-                y={ballPos.y + 2.5}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="5.0"
-                fontWeight="700"
+                x={ballPos.x} y={ballPos.y + 2.5}
+                textAnchor="middle" dominantBaseline="middle"
+                fontSize="4.8" fontWeight="800"
                 fontFamily="-apple-system,'Helvetica Neue',sans-serif"
-                fill="rgba(50,45,75,0.70)"
-                letterSpacing="0.55"
+                fill="rgba(40,36,70,0.72)" letterSpacing="0.5"
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
               >KRONE</text>
-            </>
+            </g>
+          )}
+
+          {/* Static specular highlight — gives 3-D depth, doesn't rotate */}
+          {phase !== 'sunk' && (
+            <circle cx={ballPos.x - 4} cy={ballPos.y - 4} r={3.8}
+              fill="rgba(255,255,255,0.68)" style={{ pointerEvents: 'none' }} />
           )}
 
           {/* Sunk animation */}

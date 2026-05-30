@@ -26,13 +26,15 @@ export default function RoomSubmitPanel({
     setErrMsg('');
     try {
       await submitRoomScore({
-        roomId:     roomContext.roomId,
-        playerId:   roomContext.playerId,
-        playerName: roomContext.playerName,
+        roomId:      roomContext.roomId,
+        playerId:    roomContext.playerId,
+        playerName:  roomContext.playerName,
         mode,
         scoreValue,
         scoreLabel,
         scoreType,
+        roundId:     roomContext.roundId,
+        roundNumber: roomContext.roundNumber,
       });
       setState('done');
     } catch (e) {

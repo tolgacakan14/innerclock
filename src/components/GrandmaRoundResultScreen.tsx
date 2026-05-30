@@ -7,11 +7,11 @@ interface Props {
 }
 
 export default function GrandmaRoundResultScreen({ roundIndex, patternName, score, onNext, onHome }: Props) {
-  const isLast = roundIndex === 4;
+  const isLast = roundIndex === 2;
 
   return (
     <div className="screen grandma-round-result-screen">
-      <p className="grandma-round-label-text">Round {roundIndex + 1} of 5</p>
+      <p className="grandma-round-label-text">Round {roundIndex + 1} of 3</p>
 
       <p className="grandma-pattern-name">{patternName}</p>
 

@@ -130,7 +130,14 @@ export default function CreateRoomScreen({ onBack, onCreated }: Props) {
 
     console.log('[CreateRoom] player created:', player.id);
 
-    // ── Step 3: persist locally and navigate ──────────────────────────────
+    // ── Step 3: set host_player_id on the room ────────────────────────────
+    // Best-effort — non-fatal if this column doesn't exist yet
+    await supabase
+      .from('rooms')
+      .update({ host_player_id: player.id })
+      .eq('id', room.id);
+
+    // ── Step 4: persist locally and navigate ──────────────────────────────
     const ctx = {
       roomId:     room.id,
       roomCode:   room.room_code,

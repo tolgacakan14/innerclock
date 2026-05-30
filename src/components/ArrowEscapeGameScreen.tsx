@@ -88,10 +88,14 @@ export default function ArrowEscapeGameScreen({
   const rafRef        = useRef<number>(0);
 
   // ── Timer RAF ─────────────────────────────────────────────────────────────
+  // Always reschedule — only update the elapsed state when the timer is active.
+  // Previously the tick returned early (without rescheduling) during the
+  // countdown, killing the loop before it ever had a chance to count.
   useEffect(() => {
     function tick() {
-      if (!timerActiveRef.current) return;
-      setElapsed((performance.now() - startTimeRef.current) / 1000);
+      if (timerActiveRef.current) {
+        setElapsed((performance.now() - startTimeRef.current) / 1000);
+      }
       rafRef.current = requestAnimationFrame(tick);
     }
     rafRef.current = requestAnimationFrame(tick);
@@ -116,11 +120,13 @@ export default function ArrowEscapeGameScreen({
     const active = remaining.filter(a => a.state !== 'escaping');
     if (active.length === 0 && !doneRef.current) {
       timerActiveRef.current = false;
+      // Capture once — same value used for display, overlay, and submission.
       const solveTime = (performance.now() - startTimeRef.current) / 1000;
+      setElapsed(solveTime);          // sync display to exact finish time
       setBoardCleared(true);
       doneRef.current = true;
       setTimeout(() => {
-        onCompleteRef.current(+solveTime.toFixed(1), mistakesRef.current);
+        onCompleteRef.current(+solveTime.toFixed(2), mistakesRef.current);
       }, 900);
     }
   }, []);
@@ -201,7 +207,7 @@ export default function ArrowEscapeGameScreen({
     };
   }
 
-  const fmtTime = (s: number) => s.toFixed(1) + 's';
+  const fmtTime = (s: number) => s.toFixed(2) + 's';
   const remainCount = arrows.filter(a => a.state === 'idle').length;
 
   return (
@@ -212,7 +218,7 @@ export default function ArrowEscapeGameScreen({
           style={{ pointerEvents: 'auto', color: 'rgba(255,255,255,0.55)' }}>
           ← Home
         </button>
-        <span className="ae-round-label">Round {roundIndex + 1} / 5</span>
+        <span className="ae-round-label">Round {roundIndex + 1} / 3</span>
         <span className="ae-timer-live">{fmtTime(elapsed)}</span>
       </div>
 

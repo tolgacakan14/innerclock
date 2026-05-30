@@ -8,6 +8,9 @@ import RushGame          from './components/RushGame';
 import GolfGame          from './components/GolfGame';
 import GrandmaGame       from './components/GrandmaGame';
 import ArrowEscapeGame   from './components/ArrowEscapeGame';
+import SequenceTapGame   from './components/SequenceTapGame';
+import MemoryGridGame    from './components/MemoryGridGame';
+import TapTimingGame     from './components/TapTimingGame';
 import CreateRoomScreen  from './components/CreateRoomScreen';
 import JoinRoomScreen    from './components/JoinRoomScreen';
 
@@ -22,7 +25,10 @@ type SoloView =
   | 'rush'
   | 'golf'
   | 'grandma'
-  | 'arrowEscape';
+  | 'arrowEscape'
+  | 'sequence'
+  | 'memory'
+  | 'timing';
 
 export default function SoloApp() {
   const navigate = useNavigate();
@@ -164,6 +170,24 @@ export default function SoloApp() {
   if (view === 'arrowEscape') {
     return (
       <ArrowEscapeGame key="arrowEscape" playerName={playerName} onExit={() => setView('home')} />
+    );
+  }
+
+  if (view === 'sequence') {
+    return (
+      <SequenceTapGame key="sequence" playerName={playerName} onExit={() => setView('home')} />
+    );
+  }
+
+  if (view === 'memory') {
+    return (
+      <MemoryGridGame key="memory" playerName={playerName} onExit={() => setView('home')} />
+    );
+  }
+
+  if (view === 'timing') {
+    return (
+      <TapTimingGame key="timing" playerName={playerName} onExit={() => setView('home')} />
     );
   }
 

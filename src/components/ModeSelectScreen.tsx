@@ -1,6 +1,6 @@
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 
-type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape';
+type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape' | 'sequence' | 'memory' | 'timing';
 
 interface Props {
   playerName:   string;
@@ -196,6 +196,78 @@ function GrandmaGraphic() {
   );
 }
 
+function SequenceGraphic() {
+  return (
+    <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
+      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
+      {/* 3×2 tile grid */}
+      {[0,1,2].map(col => [0,1].map(row => {
+        const colors = ['#FF453A','#FF9F0A','#30D158','#5AC8F5','#BF5AF2','#FFD60A'];
+        const i = row * 3 + col;
+        const x = 12 + col * 28;
+        const y = 30 + row * 28;
+        return (
+          <rect key={i} x={x} y={y} width="22" height="22" rx="4"
+            fill={colors[i]} opacity={i < 3 ? 0.85 : 0.30}
+            stroke={i < 3 ? 'rgba(255,255,255,0.30)' : 'none'} strokeWidth="1"/>
+        );
+      }))}
+      {/* Sequence arrows */}
+      <text x="16" y="26" fill="rgba(255,255,255,0.50)" fontSize="7">1</text>
+      <text x="44" y="26" fill="rgba(255,255,255,0.50)" fontSize="7">2</text>
+      <text x="72" y="26" fill="rgba(255,255,255,0.50)" fontSize="7">3</text>
+      <text x="50" y="94" textAnchor="middle" fill="rgba(255,255,255,0.40)" fontSize="8">Repeat the sequence</text>
+    </svg>
+  );
+}
+
+function MemoryGridGraphic() {
+  return (
+    <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
+      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
+      {/* 3×3 grid */}
+      {Array.from({length: 9}, (_, i) => {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        const lit = [1, 4, 7].includes(i);
+        return (
+          <rect key={i}
+            x={14 + col * 25} y={14 + row * 25} width="20" height="20" rx="3"
+            fill={lit ? 'rgba(90,200,245,0.82)' : 'rgba(255,255,255,0.08)'}
+            stroke={lit ? 'rgba(90,200,245,0.55)' : 'rgba(255,255,255,0.12)'} strokeWidth="1"
+          />
+        );
+      })}
+      {/* Question mark — memory cue */}
+      <text x="50" y="94" textAnchor="middle" fill="rgba(255,255,255,0.40)" fontSize="8">Remember them all</text>
+    </svg>
+  );
+}
+
+function TapTimingGraphic() {
+  return (
+    <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
+      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
+      {/* Timing bar background */}
+      <rect x="8" y="42" width="84" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
+      {/* Good zone */}
+      <rect x="22" y="42" width="56" height="14" rx="6" fill="rgba(255,159,10,0.30)"/>
+      {/* Perfect zone */}
+      <rect x="38" y="42" width="24" height="14" rx="5" fill="rgba(48,209,88,0.55)"/>
+      {/* Center line */}
+      <line x1="50" y1="38" x2="50" y2="60" stroke="rgba(48,209,88,0.70)" strokeWidth="1.5"/>
+      {/* Moving marker */}
+      <circle cx="46" cy="49" r="6" fill="rgba(255,255,255,0.95)"
+        stroke="rgba(48,209,88,0.80)" strokeWidth="2"/>
+      {/* Labels */}
+      <text x="50" y="32" textAnchor="middle" fill="rgba(48,209,88,0.80)" fontSize="6.5" fontWeight="700">PERFECT</text>
+      <text x="26" y="76" textAnchor="middle" fill="rgba(255,159,10,0.70)" fontSize="5.5">GOOD</text>
+      <text x="74" y="76" textAnchor="middle" fill="rgba(255,159,10,0.70)" fontSize="5.5">GOOD</text>
+      <text x="50" y="90" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="7">Tap on the beat</text>
+    </svg>
+  );
+}
+
 function ArrowEscapeGraphic() {
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
@@ -320,6 +392,30 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName }:
           <div className="home-card-foot">
             <p className="home-card-title">Arrow Escape</p>
             <p className="home-card-desc">Remove arrows in the right order and clear the board.</p>
+          </div>
+        </button>
+
+        <button className="home-card home-card--sequence" onClick={() => onSelect('sequence')}>
+          <div className="home-card-graphic"><SequenceGraphic/></div>
+          <div className="home-card-foot">
+            <p className="home-card-title">Sequence Tap</p>
+            <p className="home-card-desc">Watch the pattern, repeat it perfectly.</p>
+          </div>
+        </button>
+
+        <button className="home-card home-card--memory" onClick={() => onSelect('memory')}>
+          <div className="home-card-graphic"><MemoryGridGraphic/></div>
+          <div className="home-card-foot">
+            <p className="home-card-title">Memory Grid</p>
+            <p className="home-card-desc">Remember which cells light up.</p>
+          </div>
+        </button>
+
+        <button className="home-card home-card--timing" onClick={() => onSelect('timing')}>
+          <div className="home-card-graphic"><TapTimingGraphic/></div>
+          <div className="home-card-foot">
+            <p className="home-card-title">Tap Timing</p>
+            <p className="home-card-desc">Hit the perfect zone as the marker moves.</p>
           </div>
         </button>
 

@@ -7,9 +7,35 @@ export interface RoomContext {
   roomName:   string;
   playerId:   string;
   playerName: string;
+  /** Set when playing inside a party round — not persisted to localStorage. */
+  roundId?:     string;
+  roundNumber?: number;
 }
 
-export type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape';
+export type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape' | 'sequence' | 'memory' | 'timing';
+
+// ── Sequence Tap mode ─────────────────────────────────────────────────────────
+export interface SequenceTapResult {
+  completedLevels:   number;
+  maxSequenceLength: number;
+  score:             number;
+}
+
+// ── Memory Grid mode ──────────────────────────────────────────────────────────
+export interface MemoryGridResult {
+  completedRounds:   number;
+  totalCorrectCells: number;
+  score:             number;
+}
+
+// ── Tap Timing mode ───────────────────────────────────────────────────────────
+export interface TapTimingResult {
+  perfects: number;
+  goods:    number;
+  misses:   number;
+  maxCombo: number;
+  score:    number;
+}
 
 // ── Time mode ────────────────────────────────────────────────────────────────
 export interface Round {

@@ -5,38 +5,49 @@ import { supabase }                 from '../lib/supabase';
 import { loadRoomPlayer, clearRoomPlayer } from '../lib/roomStorage';
 import RoomLobbyScreen   from './RoomLobbyScreen';
 import JoinRoomScreen    from './JoinRoomScreen';
+import RoomFinalScreen   from './RoomFinalScreen';
 import TimeGame          from './TimeGame';
 import ColorGame         from './ColorGame';
 import RushGame          from './RushGame';
 import GolfGame          from './GolfGame';
 import GrandmaGame       from './GrandmaGame';
 import ArrowEscapeGame   from './ArrowEscapeGame';
+import SequenceTapGame   from './SequenceTapGame';
+import MemoryGridGame    from './MemoryGridGame';
+import TapTimingGame     from './TapTimingGame';
 
 type HubView =
   | 'loading'
   | 'not-found'
-  | 'setup'        // ask player name for this room
+  | 'setup'
   | 'lobby'
+  | 'final'
   | 'time'
   | 'color'
   | 'rush'
   | 'golf'
   | 'grandma'
-  | 'arrowEscape';
+  | 'arrowEscape'
+  | 'sequence'
+  | 'memory'
+  | 'timing';
 
 export default function RoomGameHub() {
   const { roomCode }  = useParams<{ roomCode: string }>();
   const navigate      = useNavigate();
   const code          = (roomCode ?? '').toUpperCase();
 
-  const [view,       setView]       = useState<HubView>('loading');
-  const [roomCtx,    setRoomCtx]    = useState<RoomContext | null>(null);
+  const [view,    setView]    = useState<HubView>('loading');
+  const [roomCtx, setRoomCtx] = useState<RoomContext | null>(null);
+
+  // Active party round context (cleared when returning to lobby)
+  const [roundId,     setRoundId]     = useState<string | undefined>();
+  const [roundNumber, setRoundNumber] = useState<number | undefined>();
 
   // ── Bootstrap: load or fetch room ─────────────────────────────────────────
   useEffect(() => {
     if (!code) { setView('not-found'); return; }
 
-    // 1. Try localStorage first (fast path — no network needed)
     const saved = loadRoomPlayer(code);
     if (saved) {
       setRoomCtx(saved);
@@ -44,7 +55,6 @@ export default function RoomGameHub() {
       return;
     }
 
-    // 2. Confirm room exists in Supabase before showing setup form
     (async () => {
       const { data: room, error } = await supabase
         .from('rooms')
@@ -63,7 +73,7 @@ export default function RoomGameHub() {
     })();
   }, [code]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Called after JoinRoomScreen completes inside the hub ──────────────────
+  // ── After JoinRoomScreen completes ────────────────────────────────────────
   function handleSetupDone() {
     const saved = loadRoomPlayer(code);
     if (saved) {
@@ -79,6 +89,29 @@ export default function RoomGameHub() {
     clearRoomPlayer(code);
     navigate('/');
   }
+
+  // ── Return to lobby (from any game) ───────────────────────────────────────
+  function exitToLobby() {
+    setRoundId(undefined);
+    setRoundNumber(undefined);
+    setView('lobby');
+  }
+
+  // ── Start a game mode (free-play or party round) ───────────────────────────
+  function handlePlayMode(
+    mode: HubView,
+    rid?: string,
+    rNum?: number,
+  ) {
+    setRoundId(rid);
+    setRoundNumber(rNum);
+    setView(mode);
+  }
+
+  // ── Build room context with optional round fields ─────────────────────────
+  const ctxWithRound: RoomContext | undefined = roomCtx
+    ? { ...roomCtx, roundId, roundNumber }
+    : undefined;
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (view === 'loading') {
@@ -104,7 +137,7 @@ export default function RoomGameHub() {
     );
   }
 
-  // ── Setup (ask name) ───────────────────────────────────────────────────────
+  // ── Setup ─────────────────────────────────────────────────────────────────
   if (view === 'setup') {
     return (
       <JoinRoomScreen
@@ -117,27 +150,35 @@ export default function RoomGameHub() {
 
   if (!roomCtx) return null;
 
-  // ── Lobby ──────────────────────────────────────────────────────────────────
+  // ── Lobby ─────────────────────────────────────────────────────────────────
   if (view === 'lobby') {
     return (
       <RoomLobbyScreen
         roomCtx={roomCtx}
-        onPlayMode={mode => setView(mode)}
+        onPlayMode={(mode, rid, rNum) => handlePlayMode(mode as HubView, rid, rNum)}
         onLeave={handleLeave}
       />
     );
   }
 
-  // ── Game modes (with room context injected) ────────────────────────────────
-  const exitToLobby = () => setView('lobby');
+  // ── Final results screen ──────────────────────────────────────────────────
+  if (view === 'final') {
+    return (
+      <RoomFinalScreen
+        roomCtx={roomCtx}
+        onBackToLobby={exitToLobby}
+      />
+    );
+  }
 
+  // ── Game modes ─────────────────────────────────────────────────────────────
   if (view === 'time') {
     return (
       <TimeGame
-        key={`rt-${roomCtx.roomCode}`}
+        key={`rt-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
-        roomContext={roomCtx}
+        roomContext={ctxWithRound}
       />
     );
   }
@@ -145,10 +186,10 @@ export default function RoomGameHub() {
   if (view === 'color') {
     return (
       <ColorGame
-        key={`rc-${roomCtx.roomCode}`}
+        key={`rc-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
-        roomContext={roomCtx}
+        roomContext={ctxWithRound}
       />
     );
   }
@@ -156,10 +197,10 @@ export default function RoomGameHub() {
   if (view === 'rush') {
     return (
       <RushGame
-        key={`rr-${roomCtx.roomCode}`}
+        key={`rr-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
-        roomContext={roomCtx}
+        roomContext={ctxWithRound}
       />
     );
   }
@@ -167,10 +208,10 @@ export default function RoomGameHub() {
   if (view === 'golf') {
     return (
       <GolfGame
-        key={`rg-${roomCtx.roomCode}`}
+        key={`rg-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
-        roomContext={roomCtx}
+        roomContext={ctxWithRound}
       />
     );
   }
@@ -178,10 +219,10 @@ export default function RoomGameHub() {
   if (view === 'grandma') {
     return (
       <GrandmaGame
-        key={`rgm-${roomCtx.roomCode}`}
+        key={`rgm-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
-        roomContext={roomCtx}
+        roomContext={ctxWithRound}
       />
     );
   }
@@ -189,10 +230,43 @@ export default function RoomGameHub() {
   if (view === 'arrowEscape') {
     return (
       <ArrowEscapeGame
-        key={`rae-${roomCtx.roomCode}`}
+        key={`rae-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
-        roomContext={roomCtx}
+        roomContext={ctxWithRound}
+      />
+    );
+  }
+
+  if (view === 'sequence') {
+    return (
+      <SequenceTapGame
+        key={`rs-${roomCtx.roomCode}-${roundId ?? 'free'}`}
+        playerName={roomCtx.playerName}
+        onExit={exitToLobby}
+        roomContext={ctxWithRound}
+      />
+    );
+  }
+
+  if (view === 'memory') {
+    return (
+      <MemoryGridGame
+        key={`rm-${roomCtx.roomCode}-${roundId ?? 'free'}`}
+        playerName={roomCtx.playerName}
+        onExit={exitToLobby}
+        roomContext={ctxWithRound}
+      />
+    );
+  }
+
+  if (view === 'timing') {
+    return (
+      <TapTimingGame
+        key={`rt-${roomCtx.roomCode}-${roundId ?? 'free'}`}
+        playerName={roomCtx.playerName}
+        onExit={exitToLobby}
+        roomContext={ctxWithRound}
       />
     );
   }

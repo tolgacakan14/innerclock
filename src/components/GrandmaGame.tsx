@@ -35,7 +35,7 @@ function pickRandom(arr: GrandmaPattern[], n: number): GrandmaPattern[] {
 export default function GrandmaGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }               = useBackgroundMusic();
   const [screen,       setScreen]  = useState<GrandmaScreen>('intro');
-  const [selected,     setSelected]     = useState(() => pickRandom(grandmaPatterns, 5));
+  const [selected,     setSelected]     = useState(() => pickRandom(grandmaPatterns, 3));
   const [currentRound, setCurrentRound] = useState(0);
   const [roundResults, setRoundResults] = useState<GrandmaRoundResult[]>([]);
   const [lastScore,    setLastScore]    = useState(0);
@@ -43,7 +43,7 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
 
   function handleStart() {
     setTrack('grandma');
-    setSelected(pickRandom(grandmaPatterns, 5));
+    setSelected(pickRandom(grandmaPatterns, 3));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);
@@ -66,7 +66,7 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
   }
 
   function handleNextRound() {
-    if (currentRound + 1 >= 5) {
+    if (currentRound + 1 >= 3) {
       setScreen('results');
     } else {
       setCurrentRound(prev => prev + 1);
@@ -75,7 +75,7 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
   }
 
   function handlePlayAgain() {
-    setSelected(pickRandom(grandmaPatterns, 5));
+    setSelected(pickRandom(grandmaPatterns, 3));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);

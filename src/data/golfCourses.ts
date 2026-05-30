@@ -23,17 +23,19 @@ export const golfCourses: GolfCourse[] = [
   },
 
   {
-    // Box fortress: hole inside 3-sided box with a small opening at top.
+    // Box fortress: hole inside 3-sided box. Floor has a gate (gap 240–360)
+    // so the ball enters from below; top has a narrower gap to exit for par 3.
     id: 2, name: 'Fortress', par: 3,
     ballStart: { x: 300, y: 820 },
     hole:      { x: 300, y: 220 },
     walls: [
-      { x1: 160, y1: 440, x2: 440, y2: 440 },  // box floor
+      { x1: 160, y1: 440, x2: 240, y2: 440 },  // box floor-left  (gate 240–360)
+      { x1: 360, y1: 440, x2: 440, y2: 440 },  // box floor-right
       { x1: 160, y1: 160, x2: 160, y2: 440 },  // box left side
       { x1: 440, y1: 160, x2: 440, y2: 440 },  // box right side
-      { x1: 160, y1: 160, x2: 230, y2: 160 },  // box top-left (gap 230–370)
+      { x1: 160, y1: 160, x2: 230, y2: 160 },  // box top-left  (gap 230–370)
       { x1: 370, y1: 160, x2: 440, y2: 160 },  // box top-right
-      // guard wall below
+      // guard wall below — same as before
       { x1: 0,   y1: 600, x2: 240, y2: 600 },
       { x1: 360, y1: 600, x2: 600, y2: 600 },
     ],
@@ -159,7 +161,9 @@ export const golfCourses: GolfCourse[] = [
   },
 
   {
-    // Nested boxes: two concentric boxes — enter outer, then inner.
+    // Nested boxes: two concentric boxes.
+    // Outer bottom gap 260–340 (80 px). Inner walls pulled in to x=180/x=420
+    // giving 60 px side passages (outer 120↔inner 180) so ball can navigate around.
     id: 12, name: 'Nested', par: 4,
     ballStart: { x: 300, y: 820 },
     hole:      { x: 300, y: 200 },
@@ -170,12 +174,12 @@ export const golfCourses: GolfCourse[] = [
       { x1: 120, y1: 140, x2: 120, y2: 540 },
       { x1: 480, y1: 140, x2: 480, y2: 540 },
       { x1: 120, y1: 140, x2: 480, y2: 140 },
-      // inner box (gap at top, 250–350)
-      { x1: 200, y1: 420, x2: 400, y2: 420 },
-      { x1: 200, y1: 240, x2: 200, y2: 420 },
-      { x1: 400, y1: 240, x2: 400, y2: 420 },
-      { x1: 200, y1: 240, x2: 245, y2: 240 },
-      { x1: 355, y1: 240, x2: 400, y2: 240 },
+      // inner box — wider passages: x=180 & x=420 (was 200/400)
+      { x1: 180, y1: 420, x2: 420, y2: 420 },
+      { x1: 180, y1: 250, x2: 180, y2: 420 },
+      { x1: 420, y1: 250, x2: 420, y2: 420 },
+      { x1: 180, y1: 250, x2: 240, y2: 250 },  // top-left (gap 240–360)
+      { x1: 360, y1: 250, x2: 420, y2: 250 },  // top-right
     ],
   },
 
@@ -198,17 +202,17 @@ export const golfCourses: GolfCourse[] = [
   },
 
   {
-    // Grand canyon: three channels with alternating openings, offset hole.
+    // Grand canyon: four horizontal barriers with alternating left/right gaps.
+    // Ball snakes up the fairway — each barrier forces a lane change.
+    // No straight-line trivial shot exists (barrier 2 blocks at x≈256 on a direct path).
     id: 14, name: 'Grand Canyon', par: 4,
     ballStart: { x: 100, y: 820 },
     hole:      { x: 500, y: 100 },
     walls: [
-      { x1: 200, y1: 700, x2: 600, y2: 700 },  // barrier 1 gap left (0–200)
+      { x1: 200, y1: 700, x2: 600, y2: 700 },  // barrier 1 gap left  (0–200)
       { x1: 0,   y1: 540, x2: 400, y2: 540 },  // barrier 2 gap right (400–600)
-      { x1: 200, y1: 380, x2: 600, y2: 380 },  // barrier 3 gap left (0–200)
+      { x1: 200, y1: 380, x2: 600, y2: 380 },  // barrier 3 gap left  (0–200)
       { x1: 0,   y1: 220, x2: 440, y2: 220 },  // barrier 4 gap right (440–600)
-      // vertical nudge guard to prevent trivial shot
-      { x1: 400, y1: 540, x2: 400, y2: 700 },
     ],
   },
 

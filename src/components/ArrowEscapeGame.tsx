@@ -15,7 +15,7 @@ interface Props {
 }
 
 function pickBoards() {
-  const picked = [...arrowEscapeBoards].sort(() => Math.random() - 0.5).slice(0, 5);
+  const picked = [...arrowEscapeBoards].sort(() => Math.random() - 0.5).slice(0, 3);
   if (import.meta.env.DEV) {
     const ids   = picked.map(b => b.id);
     const names = picked.map(b => b.name);
@@ -58,7 +58,7 @@ export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Pro
   }
 
   function handleNextRound() {
-    if (currentRound + 1 >= 5) {
+    if (currentRound + 1 >= 3) {
       setScreen('results');
     } else {
       setCurrentRound(prev => prev + 1);
@@ -98,7 +98,7 @@ export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Pro
           solveTime={lastResult.solveTime}
           mistakes={lastResult.mistakes}
           totalArrows={selected[currentRound].arrows.length}
-          isLast={currentRound === 4}
+          isLast={currentRound === 2}
           onNext={handleNextRound}
           onHome={onExit}
         />

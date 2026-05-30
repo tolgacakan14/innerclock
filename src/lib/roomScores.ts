@@ -19,15 +19,17 @@ export interface PlayerRow {
 }
 
 export interface ScoreRow {
-  id:          string;
-  room_id:     string;
-  player_id:   string;
-  player_name: string;
-  mode:        string;
-  score_value: number;
-  score_label: string;
-  score_type:  ScoreType;
-  created_at:  string;
+  id:           string;
+  room_id:      string;
+  player_id:    string;
+  player_name:  string;
+  mode:         string;
+  score_value:  number;
+  score_label:  string;
+  score_type:   ScoreType;
+  created_at:   string;
+  round_id?:    string | null;
+  round_number?: number | null;
 }
 
 // ── Error normaliser ──────────────────────────────────────────────────────────
@@ -84,24 +86,29 @@ export async function createPlayer(roomId: string, playerName: string): Promise<
 // ── Score helpers ─────────────────────────────────────────────────────────────
 
 export interface SubmitScoreParams {
-  roomId:     string;
-  playerId:   string;
-  playerName: string;
-  mode:       string;
-  scoreValue: number;
-  scoreLabel: string;
-  scoreType:  ScoreType;
+  roomId:      string;
+  playerId:    string;
+  playerName:  string;
+  mode:        string;
+  scoreValue:  number;
+  scoreLabel:  string;
+  scoreType:   ScoreType;
+  /** Optional — set when submitted inside a party round. */
+  roundId?:    string;
+  roundNumber?: number;
 }
 
 export async function submitRoomScore(params: SubmitScoreParams): Promise<void> {
   const { error } = await supabase.from('scores').insert({
-    room_id:     params.roomId,
-    player_id:   params.playerId,
-    player_name: params.playerName,
-    mode:        params.mode,
-    score_value: params.scoreValue,
-    score_label: params.scoreLabel,
-    score_type:  params.scoreType,
+    room_id:      params.roomId,
+    player_id:    params.playerId,
+    player_name:  params.playerName,
+    mode:         params.mode,
+    score_value:  params.scoreValue,
+    score_label:  params.scoreLabel,
+    score_type:   params.scoreType,
+    ...(params.roundId    !== undefined && { round_id:     params.roundId }),
+    ...(params.roundNumber !== undefined && { round_number: params.roundNumber }),
   });
   if (error) throw toError(error);
 }
