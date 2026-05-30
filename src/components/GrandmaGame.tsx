@@ -1,0 +1,121 @@
+import { useState } from 'react';
+import type { GrandmaRoundResult } from '../types';
+import { grandmaPatterns }          from '../data/grandmaPatterns';
+import type { GrandmaPattern }       from '../data/grandmaPatterns';
+import { useBackgroundMusic }        from '../hooks/useBackgroundMusic';
+import GrandmaIntroScreen           from './GrandmaIntroScreen';
+import GrandmaGameScreen            from './GrandmaGameScreen';
+import GrandmaRoundResultScreen     from './GrandmaRoundResultScreen';
+import GrandmaResultsScreen         from './GrandmaResultsScreen';
+
+type GrandmaScreen = 'intro' | 'playing' | 'roundResult' | 'results';
+
+interface Props {
+  playerName: string;
+  onExit:     () => void;
+}
+
+function pickRandom(arr: GrandmaPattern[], n: number): GrandmaPattern[] {
+  const picked = [...arr].sort(() => Math.random() - 0.5).slice(0, n);
+  if (import.meta.env.DEV) {
+    const ids   = picked.map(p => p.id);
+    const names = picked.map(p => p.name);
+    const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+    if (dupes.length > 0) {
+      console.warn('⚠️  Grandma: duplicate maps selected!', dupes);
+    }
+    console.group('%c🏃 Grandma Walking — maps selected', 'font-weight:bold;color:#a0c0f8');
+    names.forEach((name, i) => console.log(`  Round ${i + 1}: #${ids[i]} "${name}"`));
+    console.groupEnd();
+  }
+  return picked;
+}
+
+export default function GrandmaGame({ playerName, onExit }: Props) {
+  const { setTrack }               = useBackgroundMusic();
+  const [screen,       setScreen]  = useState<GrandmaScreen>('intro');
+  const [selected,     setSelected]     = useState(() => pickRandom(grandmaPatterns, 5));
+  const [currentRound, setCurrentRound] = useState(0);
+  const [roundResults, setRoundResults] = useState<GrandmaRoundResult[]>([]);
+  const [lastScore,    setLastScore]    = useState(0);
+  const [playCount,    setPlayCount]    = useState(0);
+
+  function handleStart() {
+    setTrack('grandma');
+    setSelected(pickRandom(grandmaPatterns, 5));
+    setCurrentRound(0);
+    setRoundResults([]);
+    setPlayCount(c => c + 1);
+    setScreen('playing');
+  }
+
+  function handleExit() {
+    setTrack('main');
+    onExit();
+  }
+
+  function handleRoundComplete(score: number) {
+    const pattern = selected[currentRound];
+    setLastScore(score);
+    setRoundResults(prev => [
+      ...prev,
+      { patternId: pattern.id, patternName: pattern.name, score },
+    ]);
+    setScreen('roundResult');
+  }
+
+  function handleNextRound() {
+    if (currentRound + 1 >= 5) {
+      setScreen('results');
+    } else {
+      setCurrentRound(prev => prev + 1);
+      setScreen('playing');
+    }
+  }
+
+  function handlePlayAgain() {
+    setSelected(pickRandom(grandmaPatterns, 5));
+    setCurrentRound(0);
+    setRoundResults([]);
+    setPlayCount(c => c + 1);
+    setScreen('playing');
+  }
+
+  return (
+    <>
+      {screen === 'intro' && (
+        <GrandmaIntroScreen onStart={handleStart} onBack={handleExit} />
+      )}
+
+      {screen === 'playing' && (
+        <GrandmaGameScreen
+          key={`grandma-${playCount}-${currentRound}`}
+          pattern={selected[currentRound]}
+          roundIndex={currentRound}
+          onComplete={handleRoundComplete}
+          onHome={handleExit}
+        />
+      )}
+
+      {screen === 'roundResult' && (
+        <GrandmaRoundResultScreen
+          key={`gr-${currentRound}`}
+          roundIndex={currentRound}
+          patternName={selected[currentRound].name}
+          score={lastScore}
+          onNext={handleNextRound}
+          onHome={handleExit}
+        />
+      )}
+
+      {screen === 'results' && (
+        <GrandmaResultsScreen
+          rounds={roundResults}
+          playerName={playerName}
+          onPlayAgain={handlePlayAgain}
+          onExit={handleExit}
+        />
+      )}
+    </>
+  );
+}
