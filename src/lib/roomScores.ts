@@ -30,11 +30,23 @@ export interface ScoreRow {
   created_at:  string;
 }
 
+// ── Error normaliser ──────────────────────────────────────────────────────────
+// Supabase returns PostgrestError (plain object, not instanceof Error).
+// This converts it to a proper Error so catch blocks always get .message.
+function toError(e: unknown): Error {
+  if (e instanceof Error) return e;
+  if (e && typeof e === 'object') {
+    const pg = e as { message?: string; code?: string; details?: string; hint?: string };
+    const msg = pg.message ?? pg.details ?? pg.code ?? JSON.stringify(e);
+    return new Error(msg);
+  }
+  return new Error(String(e));
+}
+
 // ── Room code generator ───────────────────────────────────────────────────────
-// Avoids O/0/I/1 to reduce confusion.
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-function generateCode(): string {
+export function generateRoomCode(): string {
   return Array.from(
     { length: 7 },
     () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
@@ -49,30 +61,12 @@ export async function getRoomByCode(code: string): Promise<RoomRow | null> {
     .select('*')
     .eq('room_code', code.trim().toUpperCase())
     .single();
-  // PGRST116 = "no rows returned" — treat as not found, not an error
+  // PGRST116 = "no rows returned" — not an error, just means room doesn't exist
   if (error) {
     if (error.code === 'PGRST116') return null;
-    throw error;
+    throw toError(error);
   }
   return data as RoomRow | null;
-}
-
-export async function createRoom(roomName: string): Promise<RoomRow> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateCode();
-    const { data, error } = await supabase
-      .from('rooms')
-      .insert({ room_code: code, room_name: roomName.trim() })
-      .select()
-      .single();
-
-    if (!error && data) return data as RoomRow;
-
-    // On unique-constraint collision try again; otherwise rethrow.
-    const msg = (error?.message ?? '').toLowerCase();
-    if (!msg.includes('duplicate') && !msg.includes('unique')) throw error;
-  }
-  throw new Error('Could not generate a unique room code. Please try again.');
 }
 
 // ── Player helpers ────────────────────────────────────────────────────────────
@@ -83,7 +77,7 @@ export async function createPlayer(roomId: string, playerName: string): Promise<
     .insert({ room_id: roomId, player_name: playerName.trim() })
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw toError(error);
   return data as PlayerRow;
 }
 
@@ -109,7 +103,7 @@ export async function submitRoomScore(params: SubmitScoreParams): Promise<void> 
     score_label: params.scoreLabel,
     score_type:  params.scoreType,
   });
-  if (error) throw error;
+  if (error) throw toError(error);
 }
 
 export async function getRoomScores(roomId: string): Promise<ScoreRow[]> {
@@ -118,6 +112,6 @@ export async function getRoomScores(roomId: string): Promise<ScoreRow[]> {
     .select('*')
     .eq('room_id', roomId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) throw toError(error);
   return (data ?? []) as ScoreRow[];
 }
