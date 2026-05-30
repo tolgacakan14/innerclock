@@ -7,13 +7,14 @@ export type RoundStatus = 'waiting' | 'active' | 'completed';
 
 /** All possible game_status values on the rooms table. */
 export type GameStatus =
-  | 'waiting'         // lobby — no game in progress
-  | 'mode_selected'   // host picked mode, waiting for start
-  | 'countdown'       // 3-2-1-GO synced countdown in progress
-  | 'playing'         // challenge is live (async competitive)
-  | 'round_completed' // one round finished
-  | 'active'          // legacy: 5-round party system in progress
-  | 'completed';      // whole party done
+  | 'waiting'          // lobby — no game in progress
+  | 'mode_selected'    // host picked mode, waiting for start
+  | 'countdown'        // 3-2-1-GO synced countdown in progress
+  | 'challenge_active' // async competitive challenge is live
+  | 'playing'          // synchronized game live (after countdown)
+  | 'round_completed'  // one round finished
+  | 'active'           // legacy: 5-round party system in progress
+  | 'completed';       // whole party done
 
 export interface RoundRow {
   id:           string;
@@ -140,109 +141,120 @@ export async function getLobbyPlayers(roomId: string): Promise<LobbyPlayerRow[]>
 // ── Room status ───────────────────────────────────────────────────────────────
 
 /**
- * Fetch room with all status columns.
- * Falls back to basic room data if extended columns don't exist in the schema yet.
- * This ensures the lobby still loads even if the SQL migration hasn't been run.
+ * Fetch the full room row.
+ *
+ * Uses SELECT * so the query never fails due to a missing optional column
+ * (countdown_starts_at, active_round_id, current_round_number).
+ * Any column that doesn't exist yet simply won't be in the returned object;
+ * callers handle missing fields with `?? null` guards.
+ *
+ * Throws for any error OTHER than "row not found" (PGRST116).
+ * This is intentional: the caller (fetchAll) should keep the existing room
+ * state rather than overwriting it with partial/default values.
  */
 export async function getRoomWithStatus(roomId: string): Promise<RoomWithStatus | null> {
-  // Try full schema first
   const { data, error } = await supabase
     .from('rooms')
-    .select(
-      'id, room_code, room_name, host_player_id, game_status, ' +
-      'selected_mode, countdown_starts_at, active_round_id, current_round_number',
-    )
+    .select('*')          // ← never fails due to missing optional columns
     .eq('id', roomId)
     .single();
 
   if (!error) {
+    console.log('[roomRounds] getRoomWithStatus →', {
+      id:            (data as { id?: string }).id,
+      game_status:   (data as { game_status?: string }).game_status,
+      selected_mode: (data as { selected_mode?: string }).selected_mode,
+    });
     return data as unknown as RoomWithStatus;
   }
 
-  // If PGRST116, room simply doesn't exist
+  // PGRST116 = no row found (room deleted / wrong id)
   if ((error as { code?: string }).code === 'PGRST116') {
+    console.warn('[roomRounds] getRoomWithStatus: room not found (PGRST116)');
     return null;
   }
 
-  // Extended columns may not exist yet — fall back to basic select
-  console.warn('[roomRounds] getRoomWithStatus full select failed, falling back to basic:', error.message);
-
-  const { data: basic, error: basicErr } = await supabase
-    .from('rooms')
-    .select('id, room_code, room_name')
-    .eq('id', roomId)
-    .single();
-
-  if (basicErr) {
-    if ((basicErr as { code?: string }).code === 'PGRST116') return null;
-    throw toError(basicErr);
-  }
-  if (!basic) return null;
-
-  // Return a RoomWithStatus with defaults for missing columns
-  return {
-    ...(basic as { id: string; room_code: string; room_name: string }),
-    host_player_id:       null,
-    game_status:          'waiting',
-    selected_mode:        null,
-    countdown_starts_at:  null,
-    active_round_id:      null,
-    current_round_number: null,
-  } as RoomWithStatus;
+  // Any other error: throw so the caller keeps existing UI state
+  // (NEVER return a partial room with selected_mode: null — that wipes the UI)
+  console.error('[roomRounds] getRoomWithStatus error:', {
+    message: (error as { message?: string }).message,
+    code:    (error as { code?:    string }).code,
+  });
+  throw toError(error);
 }
 
 // ── Synchronized single-round game flow ───────────────────────────────────────
+
+// ── Internal helper: log and throw if a rooms UPDATE affected 0 rows ──────────
+function assertUpdated(
+  data: unknown[] | null | undefined,
+  label: string,
+): void {
+  if (!data || (data as unknown[]).length === 0) {
+    console.error(
+      `[roomRounds] ${label}: UPDATE returned 0 rows — ` +
+      'likely an RLS policy is blocking write or the room does not exist. ' +
+      'Run the SQL migration (Add public update policy on rooms).',
+    );
+    throw new Error(
+      `${label} failed: Supabase UPDATE affected 0 rows. ` +
+      'Check Supabase RLS — you may need: ' +
+      "CREATE POLICY \"Allow public update rooms\" ON rooms FOR UPDATE USING (true) WITH CHECK (true);",
+    );
+  }
+}
 
 /**
  * Host selects a mode — persists to Supabase immediately.
  * Sets game_status = 'mode_selected' so non-hosts can see the selection.
  *
+ * Returns the updated row so callers can do optimistic state patches.
+ * Throws if 0 rows are affected (silent RLS block) or on any Supabase error.
  * Fallback: if game_status column is missing, retries with selected_mode only.
  */
-export async function hostSelectMode(roomId: string, mode: string): Promise<void> {
+export async function hostSelectMode(
+  roomId: string,
+  mode: string,
+): Promise<{ selected_mode: string; game_status: string }> {
   console.log('[roomRounds] hostSelectMode →', { roomId, mode });
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('rooms')
     .update({ selected_mode: mode, game_status: 'mode_selected' })
-    .eq('id', roomId);
+    .eq('id', roomId)
+    .select('id, selected_mode, game_status');
 
   if (!error) {
-    console.log('[roomRounds] hostSelectMode succeeded');
-    return;
+    console.log('[roomRounds] hostSelectMode confirmed rows:', data);
+    assertUpdated(data, 'hostSelectMode');
+    const row = (data as Array<{ selected_mode: string; game_status: string }>)[0];
+    return row;
   }
 
-  // Log every field so the caller can see exactly what Supabase returned
   const pg = error as { message?: string; code?: string; details?: string; hint?: string };
   console.error('[roomRounds] hostSelectMode error', {
-    message: pg.message,
-    code:    pg.code,
-    details: pg.details,
-    hint:    pg.hint,
+    message: pg.message, code: pg.code, details: pg.details, hint: pg.hint,
   });
 
   const msg  = (pg.message ?? '').toLowerCase();
   const code = pg.code ?? '';
 
-  // If the error is a missing column (PostgreSQL code 42703), retry without game_status
+  // PostgreSQL 42703 = undefined_column: game_status/selected_mode column is missing
   if (code === '42703' || msg.includes('column') || msg.includes('does not exist')) {
     console.warn('[roomRounds] hostSelectMode: column missing — retrying with selected_mode only');
-    const { error: e2 } = await supabase
+    const { data: d2, error: e2 } = await supabase
       .from('rooms')
       .update({ selected_mode: mode })
-      .eq('id', roomId);
+      .eq('id', roomId)
+      .select('id, selected_mode');
     if (e2) {
       const pg2 = e2 as { message?: string; code?: string; details?: string; hint?: string };
-      console.error('[roomRounds] hostSelectMode fallback also failed', {
-        message: pg2.message,
-        code:    pg2.code,
-        details: pg2.details,
-        hint:    pg2.hint,
-      });
+      console.error('[roomRounds] hostSelectMode fallback also failed', pg2);
       throw toError(e2);
     }
-    console.log('[roomRounds] hostSelectMode fallback (selected_mode only) succeeded');
-    return;
+    console.log('[roomRounds] hostSelectMode fallback rows:', d2);
+    assertUpdated(d2, 'hostSelectMode-fallback');
+    return { selected_mode: mode, game_status: 'mode_selected' };
   }
 
   throw toError(error);
@@ -255,38 +267,58 @@ export async function hostSelectMode(roomId: string, mode: string): Promise<void
 export async function hostStartGame(roomId: string, mode: string): Promise<void> {
   console.log('[roomRounds] hostStartGame →', { roomId, mode });
   const startsAt = new Date(Date.now() + 3000).toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('rooms')
     .update({
       selected_mode:       mode,
       game_status:         'countdown',
       countdown_starts_at: startsAt,
     })
-    .eq('id', roomId);
+    .eq('id', roomId)
+    .select('id, game_status');
   if (error) {
     const pg = error as { message?: string; code?: string; details?: string; hint?: string };
     console.error('[roomRounds] hostStartGame error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
     throw toError(error);
   }
-  console.log('[roomRounds] hostStartGame succeeded');
+  assertUpdated(data, 'hostStartGame');
+  console.log('[roomRounds] hostStartGame confirmed:', data);
 }
 
 /**
- * Host starts a challenge without a countdown (async competitive mode).
+ * Host starts an async competitive challenge — no countdown.
  * All players get a "Play Challenge" button immediately.
+ *
+ * Returns the confirmed updated row from Supabase so the caller can apply
+ * the exact DB state without a separate re-fetch (avoids stale-overwrite race).
+ *
+ * NOTE: intentionally does NOT touch countdown_starts_at here — that column
+ * may not exist in all deployments, and this flow does not need it.
  */
-export async function hostStartChallenge(roomId: string): Promise<void> {
+export async function hostStartChallenge(
+  roomId: string,
+): Promise<{ game_status: string; selected_mode: string | null }> {
   console.log('[roomRounds] hostStartChallenge →', { roomId });
-  const { error } = await supabase
+
+  const { data, error } = await supabase
     .from('rooms')
-    .update({ game_status: 'playing', countdown_starts_at: null })
-    .eq('id', roomId);
+    .update({ game_status: 'challenge_active' })
+    .eq('id', roomId)
+    .select('id, game_status, selected_mode');
+
   if (error) {
     const pg = error as { message?: string; code?: string; details?: string; hint?: string };
-    console.error('[roomRounds] hostStartChallenge error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
+    console.error('[roomRounds] hostStartChallenge error', {
+      message: pg.message, code: pg.code, details: pg.details, hint: pg.hint,
+    });
     throw toError(error);
   }
-  console.log('[roomRounds] hostStartChallenge succeeded');
+
+  assertUpdated(data, 'hostStartChallenge');
+
+  const row = (data as Array<{ game_status: string; selected_mode: string | null }>)[0];
+  console.log('[roomRounds] hostStartChallenge confirmed:', row);
+  return row;
 }
 
 /**
@@ -294,14 +326,19 @@ export async function hostStartChallenge(roomId: string): Promise<void> {
  */
 export async function setRoomPlaying(roomId: string): Promise<void> {
   console.log('[roomRounds] setRoomPlaying →', { roomId });
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('rooms')
     .update({ game_status: 'playing' })
-    .eq('id', roomId);
+    .eq('id', roomId)
+    .select('id, game_status');
   if (error) {
     const pg = error as { message?: string; code?: string; details?: string; hint?: string };
     console.error('[roomRounds] setRoomPlaying error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
     throw toError(error);
+  }
+  // Non-fatal if 0 rows (another client may have already set it)
+  if (!data || (data as unknown[]).length === 0) {
+    console.warn('[roomRounds] setRoomPlaying: 0 rows updated (may be a concurrent write)');
   }
 }
 
@@ -310,7 +347,7 @@ export async function setRoomPlaying(roomId: string): Promise<void> {
  */
 export async function resetRoom(roomId: string): Promise<void> {
   console.log('[roomRounds] resetRoom →', { roomId });
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('rooms')
     .update({
       game_status:         'waiting',
@@ -318,13 +355,15 @@ export async function resetRoom(roomId: string): Promise<void> {
       countdown_starts_at: null,
       active_round_id:     null,
     })
-    .eq('id', roomId);
+    .eq('id', roomId)
+    .select('id, game_status');
   if (error) {
     const pg = error as { message?: string; code?: string; details?: string; hint?: string };
     console.error('[roomRounds] resetRoom error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
     throw toError(error);
   }
-  console.log('[roomRounds] resetRoom succeeded');
+  assertUpdated(data, 'resetRoom');
+  console.log('[roomRounds] resetRoom confirmed:', data);
 }
 
 // ── 5-Round party system ──────────────────────────────────────────────────────

@@ -25,6 +25,7 @@ import {
   type LobbyPlayerRow,
   type RoomWithStatus,
   type RoundRow,
+  type GameStatus,
 } from '../lib/roomRounds';
 
 // ── Mode definitions ──────────────────────────────────────────────────────────
@@ -110,23 +111,33 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       console.error('[RoomHub] players fetch error', pResult.reason);
     }
 
-    // Room status
+    // Room status — ONLY update state if we got real data back.
+    // If getRoomWithStatus threw (non-PGRST116 error) or returned null,
+    // we keep the existing room state to avoid wiping selected_mode / game_status.
     if (rResult.status === 'fulfilled') {
-      setRoom(rResult.value);
+      const newRoom = rResult.value;
+      if (newRoom !== null) {
+        setRoom(newRoom);
+      } else {
+        // null means room was deleted (PGRST116); keep showing current state
+        console.warn('[RoomFetch] room row not found — keeping existing state');
+      }
       setLoadErr('');
     } else {
-      console.error('[RoomHub] room fetch error', rResult.reason);
-      // Only show error if players also failed — room is critical
+      // getRoomWithStatus threw — keep existing room state, just log the error
+      console.error('[RoomHub] room fetch error (keeping existing state):', rResult.reason);
       if (pResult.status === 'rejected') {
         setLoadErr('Could not load room. Retrying…');
       }
     }
 
-    // Debug identity info
+    // Debug identity + competitive state
     const fetchedRoom = rResult.status === 'fulfilled' ? rResult.value : null;
     const fetchedPlayers = pResult.status === 'fulfilled' ? pResult.value : [];
     const currentPlayer = fetchedPlayers.find(p => p.id === roomCtx.playerId) ?? null;
-    console.log('[RoomHub] room', fetchedRoom);
+    console.log('[RoomFetch] fetched room full object', fetchedRoom);
+    console.log('[RoomFetch] selected_mode', fetchedRoom?.selected_mode ?? null);
+    console.log('[RoomFetch] game_status',   fetchedRoom?.game_status   ?? null);
     console.log('[RoomHub] players', fetchedPlayers.map(p => p.player_name));
     console.log('[RoomHub] currentPlayer', currentPlayer);
     console.log('[RoomHub] currentPlayerId', roomCtx.playerId);
@@ -218,6 +229,9 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
   // ── Self-heal: write host_player_id to DB if localStorage says isHost ───
   useEffect(() => {
+    // Log current isHost state whenever room or identity changes
+    console.log('[Competitive] isHost', isHost, '| isHostByDB', isHostByDB, '| isHostByLocal', isHostByLocal);
+
     // Only run once, only when DB has no host and localStorage says we are host
     if (!isHostByLocal || selfHealRef.current || room === null) return;
     selfHealRef.current = true;
@@ -233,10 +247,28 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
   }, [isHostByLocal, room]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const gs          = room?.game_status ?? 'waiting';
+  const gs           = room?.game_status ?? 'waiting';
   const selectedMode = room?.selected_mode ?? null;
-  const activeRound = rounds.find(r => r.status === 'active');
+  const activeRound  = rounds.find(r => r.status === 'active');
   const allRoundsDone = rounds.length === 5 && rounds.every(r => r.status === 'completed');
+
+  // Whether to show the Play Challenge button (challenge flow)
+  const challengeIsActive        = gs === 'challenge_active' || gs === 'playing';
+  const shouldShowPlay           = challengeIsActive && !!selectedMode;
+  const shouldShowSelectedPanel  = !!selectedMode && gs === 'mode_selected';
+  const shouldShowStartChallenge = isHost && shouldShowSelectedPanel;
+
+  // ── Render-state diagnostics (fires whenever relevant state changes) ───────
+  useEffect(() => {
+    console.log('[Render] room.selected_mode',       room?.selected_mode ?? null);
+    console.log('[Render] room.game_status',         room?.game_status   ?? null);
+    console.log('[Render] local selectedMode',       selectedMode);
+    console.log('[Render] shouldShowSelectedPanel',  shouldShowSelectedPanel);
+    console.log('[Render] shouldShowStartChallenge', shouldShowStartChallenge);
+    console.log('[Render] shouldShowPlay',           shouldShowPlay);
+    console.log('[Render] isHost',                   isHost);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs, selectedMode, isHost, shouldShowPlay, shouldShowSelectedPanel, shouldShowStartChallenge]);
 
   // Recent scores (last 5 overall)
   const recentScores = allScores.slice(0, 5);
@@ -297,68 +329,142 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
     setTimeout(() => setCopied(false), 2000);
   }
 
-  /** Host taps a mode card → persists selection to Supabase immediately */
+  // ── Poll management ──────────────────────────────────────────────────────────
+  // Stop the polling interval before a write so an in-flight poll can't overwrite
+  // the confirmed result.  Call resumePoll() in the finally block.
+  function pausePoll() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }
+  function resumePoll() {
+    if (!pollRef.current) {
+      pollRef.current = setInterval(fetchAll, 2000);
+    }
+  }
+
+  // ── Host action handlers ───────────────────────────────────────────────────
+
+  /** Host taps a mode card → writes to Supabase, applies confirmed result locally */
   async function handleSelectMode(mode: GameMode) {
     if (!isHost) {
-      console.warn('[RoomLobby] selectMode called but isHost=false — ignoring');
+      console.warn('[Competitive] selectMode called but isHost=false — ignoring');
       return;
     }
 
-    console.log('[RoomLobby] selecting mode', mode);
-    console.log('[RoomLobby] room id', roomCtx.roomId);
-    console.log('[RoomLobby] isHost', isHost);
-    console.log('[RoomLobby] hostPlayerId', room?.host_player_id);
+    console.log('[ModeSelect] clicked', mode);
+    console.log('[ModeSelect] room before', room);
+    console.log('[ModeSelect] payload', { selected_mode: mode, game_status: 'mode_selected' });
+    console.log('[ModeSelect] isHost', isHost);
+    console.log('[ModeSelect] hostPlayerId', room?.host_player_id);
 
+    pausePoll();
     setBusy(true); setActionErr('');
     try {
-      await hostSelectMode(roomCtx.roomId, mode);
-      await fetchAll();
+      const updated = await hostSelectMode(roomCtx.roomId, mode);
+      console.log('[ModeSelect] update data', updated);
+
+      // Apply the CONFIRMED DB result — no stale overwrite possible
+      setRoom(prev => {
+        const next = prev ? {
+          ...prev,
+          selected_mode: updated.selected_mode ?? mode,
+          game_status:   (updated.game_status ?? 'mode_selected') as GameStatus,
+        } : prev;
+        console.log('[Effect] setting room state', next);
+        return next;
+      });
+
+      // Fire-and-forget: update players/scores (won't overwrite room if fetch fails)
+      fetchAll();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      console.error('[RoomLobby] select mode error', e);
-      // Surface the actual DB error so it's visible in the UI
+      console.error('[Competitive] mode select error', e);
       setActionErr(`Could not select mode: ${errMsg}`);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+      resumePoll();
+    }
   }
 
   /** Synchronized 3-2-1-GO countdown launch */
   async function handleStartSynced() {
     if (!selectedMode) return;
+    console.log('[Competitive] starting synced game', { mode: selectedMode, roomId: roomCtx.roomId });
+    pausePoll();
     setBusy(true); setActionErr('');
     try {
       await hostStartGame(roomCtx.roomId, selectedMode);
       hasLaunchedRef.current = false;
-      await fetchAll();
+      setRoom(prev => prev ? { ...prev, game_status: 'countdown' as GameStatus } : prev);
+      fetchAll();
     } catch (e) {
-      console.error('[RoomLobby] failed to start synced game', e);
-      setActionErr('Could not start game. Try again.');
-    } finally { setBusy(false); }
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error('[Competitive] start synced error', e);
+      setActionErr(`Could not start game: ${errMsg}`);
+    } finally {
+      setBusy(false);
+      resumePoll();
+    }
   }
 
-  /** Async challenge — no countdown, players tap when ready */
+  /** Async challenge — no countdown, everyone taps Play Challenge when ready */
   async function handleStartChallenge() {
     if (!selectedMode) return;
+
+    console.log('[Challenge] start clicked');
+    console.log('[Challenge] selected_mode', room?.selected_mode);
+    console.log('[Challenge] room before start', room);
+    console.log('[Challenge] start update payload', { game_status: 'challenge_active' });
+
+    pausePoll();
     setBusy(true); setActionErr('');
     try {
-      await hostStartChallenge(roomCtx.roomId);
+      const confirmed = await hostStartChallenge(roomCtx.roomId);
+      console.log('[Challenge] start update result', confirmed);
+
+      // Apply the CONFIRMED row — game_status is now 'challenge_active'
+      setRoom(prev =>
+        prev ? {
+          ...prev,
+          game_status:   confirmed.game_status as GameStatus,
+          selected_mode: confirmed.selected_mode ?? prev.selected_mode,
+        } : prev,
+      );
+
       hasLaunchedRef.current = false;
-      await fetchAll();
+
+      // Fire-and-forget update for scores/players
+      fetchAll();
     } catch (e) {
-      console.error('[RoomLobby] failed to start challenge', e);
-      setActionErr('Could not start challenge. Try again.');
-    } finally { setBusy(false); }
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error('[Challenge] start update error', e);
+      setActionErr(`Could not start challenge: ${errMsg}`);
+    } finally {
+      setBusy(false);
+      resumePoll();
+    }
   }
 
   async function handleReset() {
+    console.log('[Competitive] resetting room', roomCtx.roomId);
+    pausePoll();
     setBusy(true); setActionErr('');
     try {
       await resetRoom(roomCtx.roomId);
       hasLaunchedRef.current = false;
-      await fetchAll();
+      setRoom(prev => prev ? {
+        ...prev,
+        game_status:  'waiting' as GameStatus,
+        selected_mode: null,
+      } : prev);
+      fetchAll();
     } catch (e) {
-      console.error('[RoomLobby] failed to reset room', e);
-      setActionErr('Could not reset room.');
-    } finally { setBusy(false); }
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error('[Competitive] reset error', e);
+      setActionErr(`Could not reset room: ${errMsg}`);
+    } finally {
+      setBusy(false);
+      resumePoll();
+    }
   }
 
   // 5-round party handlers
@@ -571,10 +677,11 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
               {renderModeSelector()}
 
-              {selectedMode && (
+              {/* Start Challenge panel — only when mode is selected AND game_status = mode_selected */}
+              {shouldShowStartChallenge && (
                 <div className="lobby-challenge-start-panel">
                   <p className="lobby-challenge-selected-label">
-                    Selected: {MODE_ICONS[selectedMode]} <strong>{MODE_LABELS_FULL[selectedMode]}</strong>
+                    Selected: {MODE_ICONS[selectedMode!]} <strong>{MODE_LABELS_FULL[selectedMode!]}</strong>
                   </p>
                   <div className="lobby-challenge-start-btns">
                     <button
@@ -594,6 +701,13 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* Show selected-but-not-started info when mode selected but not host starting yet */}
+              {selectedMode && !shouldShowStartChallenge && gs === 'mode_selected' && (
+                <p className="lobby-challenge-selected-label">
+                  Selected: {MODE_ICONS[selectedMode]} <strong>{MODE_LABELS_FULL[selectedMode]}</strong>
+                </p>
               )}
 
               {!selectedMode && (
@@ -628,17 +742,25 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
         </div>
       )}
 
-      {/* ── Challenge Active (gs = playing) ───────────────────────────────── */}
-      {gs === 'playing' && selectedMode && (
+      {/* ── Challenge Active (game_status = challenge_active or playing) ─────── */}
+      {shouldShowPlay && (
         <div className="room-party-section">
           <span className="room-section-title">
-            🏆 Challenge Active — {MODE_ICONS[selectedMode]} {MODE_LABELS_FULL[selectedMode]}
+            🏆 Challenge Active — {MODE_ICONS[selectedMode!]} {MODE_LABELS_FULL[selectedMode!]}
           </span>
 
           <div className="lobby-challenge-active-panel">
+            {/* Everyone — host AND non-host — gets Play Challenge */}
             <button
               className="btn-primary room-party-start-btn lobby-play-challenge-btn"
-              onClick={() => onPlayMode(selectedMode as GameMode)}
+              onClick={() => {
+                if (!selectedMode) {
+                  console.warn('[Challenge] Play Challenge clicked but selectedMode is null');
+                  return;
+                }
+                console.log('[Challenge] Play Challenge clicked, launching', selectedMode);
+                onPlayMode(selectedMode as GameMode);
+              }}
             >
               ▶ Play Challenge
             </button>
@@ -651,9 +773,6 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
           {isHost && (
             <div className="lobby-host-controls">
-              <button className="btn-secondary room-party-start-btn" onClick={() => {
-                // Host can switch to a new challenge via reset + re-select
-              }} style={{ display: 'none' }} />
               <button className="lobby-reset-btn" onClick={handleReset} disabled={busy}>
                 ↺ End Challenge / New Round
               </button>
