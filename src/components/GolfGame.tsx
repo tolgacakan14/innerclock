@@ -9,8 +9,9 @@ import GolfResultsScreen          from './GolfResultsScreen';
 type GolfScreen = 'intro' | 'playing' | 'roundComplete' | 'results';
 
 interface Props {
-  playerName: string;
-  onExit:     () => void;
+  playerName:   string;
+  onExit:       () => void;
+  roomContext?: import('../types').RoomContext;
 }
 
 /** Pick n unique items from an array at random */
@@ -19,7 +20,7 @@ function pickRandom<T>(arr: T[], n: number): T[] {
   return copy.slice(0, n);
 }
 
-export default function GolfGame({ playerName, onExit }: Props) {
+export default function GolfGame({ playerName, onExit, roomContext }: Props) {
   const [screen,       setScreen]       = useState<GolfScreen>('intro');
   const [selected,     setSelected]     = useState(() => pickRandom(golfCourses, 5));
   const [currentRound, setCurrentRound] = useState(0);   // 0–4
@@ -104,6 +105,7 @@ export default function GolfGame({ playerName, onExit }: Props) {
           playerName={playerName}
           onPlayAgain={handlePlayAgain}
           onExit={onExit}
+          roomContext={roomContext}
         />
       )}
     </>

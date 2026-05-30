@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { ColorRound } from '../types';
+import type { ColorRound, RoomContext } from '../types';
+import RoomSubmitPanel from './RoomSubmitPanel';
 
 interface Props {
-  rounds:      ColorRound[];
-  playerName:  string;
-  onPlayAgain: () => void;
-  onExit:      () => void;
+  rounds:       ColorRound[];
+  playerName:   string;
+  onPlayAgain:  () => void;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
 function getMessage(score: number): string {
@@ -16,7 +18,7 @@ function getMessage(score: number): string {
   return 'Your color memory needs training.';
 }
 
-export default function ColorResultsScreen({ rounds, playerName, onPlayAgain, onExit }: Props) {
+export default function ColorResultsScreen({ rounds, playerName, onPlayAgain, onExit, roomContext }: Props) {
   const [copied, setCopied] = useState(false);
   const total   = rounds.reduce((s, r) => s + r.score, 0);
   const message = getMessage(total);
@@ -86,6 +88,17 @@ export default function ColorResultsScreen({ rounds, playerName, onPlayAgain, on
         <button className="btn-secondary" onClick={onPlayAgain}>Play Again</button>
         <button className="btn-ghost" onClick={onExit}>← Home</button>
       </div>
+
+      {roomContext && (
+        <RoomSubmitPanel
+          roomContext={roomContext}
+          mode="Colour Mode"
+          scoreValue={total}
+          scoreLabel={`${total} / 500`}
+          scoreType="higher_is_better"
+          onBackToRoom={onExit}
+        />
+      )}
     </div>
   );
 }

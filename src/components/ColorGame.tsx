@@ -5,16 +5,17 @@ import ColorMatchScreen    from './ColorMatchScreen';
 import ColorFeedbackScreen from './ColorFeedbackScreen';
 import ColorResultsScreen  from './ColorResultsScreen';
 import { generateDiverseColorSet, calcColorScore } from '../utils';
-import type { TargetColor, ColorRound } from '../types';
+import type { TargetColor, ColorRound, RoomContext } from '../types';
 
 type ColorScreen = 'start' | 'observe' | 'match' | 'feedback' | 'results';
 
 interface Props {
-  playerName: string;
-  onExit:     () => void;
+  playerName:   string;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
-export default function ColorGame({ playerName, onExit }: Props) {
+export default function ColorGame({ playerName, onExit, roomContext }: Props) {
   const [screen,           setScreen]           = useState<ColorScreen>('start');
   const [targets,          setTargets]          = useState<TargetColor[]>([]);
   const [rounds,           setRounds]           = useState<ColorRound[]>([]);
@@ -90,6 +91,7 @@ export default function ColorGame({ playerName, onExit }: Props) {
           playerName={playerName}
           onPlayAgain={handleStart}
           onExit={onExit}
+          roomContext={roomContext}
         />
       )}
     </>

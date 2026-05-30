@@ -11,8 +11,9 @@ import GrandmaResultsScreen         from './GrandmaResultsScreen';
 type GrandmaScreen = 'intro' | 'playing' | 'roundResult' | 'results';
 
 interface Props {
-  playerName: string;
-  onExit:     () => void;
+  playerName:   string;
+  onExit:       () => void;
+  roomContext?: import('../types').RoomContext;
 }
 
 function pickRandom(arr: GrandmaPattern[], n: number): GrandmaPattern[] {
@@ -31,7 +32,7 @@ function pickRandom(arr: GrandmaPattern[], n: number): GrandmaPattern[] {
   return picked;
 }
 
-export default function GrandmaGame({ playerName, onExit }: Props) {
+export default function GrandmaGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }               = useBackgroundMusic();
   const [screen,       setScreen]  = useState<GrandmaScreen>('intro');
   const [selected,     setSelected]     = useState(() => pickRandom(grandmaPatterns, 5));
@@ -114,6 +115,7 @@ export default function GrandmaGame({ playerName, onExit }: Props) {
           playerName={playerName}
           onPlayAgain={handlePlayAgain}
           onExit={handleExit}
+          roomContext={roomContext}
         />
       )}
     </>

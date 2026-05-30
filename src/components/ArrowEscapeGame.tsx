@@ -9,8 +9,9 @@ import ArrowEscapeResultsScreen       from './ArrowEscapeResultsScreen';
 type AEScreen = 'intro' | 'playing' | 'roundResult' | 'results';
 
 interface Props {
-  playerName: string;
-  onExit:     () => void;
+  playerName:   string;
+  onExit:       () => void;
+  roomContext?: import('../types').RoomContext;
 }
 
 function pickBoards() {
@@ -27,7 +28,7 @@ function pickBoards() {
   return picked;
 }
 
-export default function ArrowEscapeGame({ playerName, onExit }: Props) {
+export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Props) {
   const [screen,       setScreen]       = useState<AEScreen>('intro');
   const [selected,     setSelected]     = useState(() => pickBoards());
   const [currentRound, setCurrentRound] = useState(0);
@@ -109,6 +110,7 @@ export default function ArrowEscapeGame({ playerName, onExit }: Props) {
           playerName={playerName}
           onPlayAgain={handlePlayAgain}
           onExit={onExit}
+          roomContext={roomContext}
         />
       )}
     </>

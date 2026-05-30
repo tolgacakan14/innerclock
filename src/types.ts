@@ -1,5 +1,14 @@
 export type ShapeName = 'circle' | 'square' | 'triangle' | 'diamond' | 'ring' | 'blob';
 
+// ── Room / multiplayer ────────────────────────────────────────────────────────
+export interface RoomContext {
+  roomId:     string;
+  roomCode:   string;
+  roomName:   string;
+  playerId:   string;
+  playerName: string;
+}
+
 export type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape';
 
 // ── Time mode ────────────────────────────────────────────────────────────────

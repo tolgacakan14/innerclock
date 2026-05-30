@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import type { RoomContext } from '../types';
+import RoomSubmitPanel from './RoomSubmitPanel';
 
 interface Props {
-  score:         number;   // raw total score
-  normalHits:    number;   // taps during normal phase (×1 each)
-  finalRushHits: number;   // taps during final 10 s (×2 each)
-  bonusPoints:   number;   // points from bonus targets (chaser +5, grandma +8)
-  playerName:    string;
-  onPlayAgain:   () => void;
-  onExit:        () => void;
+  score:          number;
+  normalHits:     number;
+  finalRushHits:  number;
+  bonusPoints:    number;
+  playerName:     string;
+  onPlayAgain:    () => void;
+  onExit:         () => void;
+  roomContext?:  RoomContext;
 }
 
 /**
@@ -38,7 +41,7 @@ function buildCopyText(
 }
 
 export default function RushResultsScreen({
-  score, normalHits, finalRushHits, bonusPoints, playerName, onPlayAgain, onExit,
+  score, normalHits, finalRushHits, bonusPoints, playerName, onPlayAgain, onExit, roomContext,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const message = getMessage(score);
@@ -112,6 +115,17 @@ export default function RushResultsScreen({
         <button className="btn-secondary" onClick={onPlayAgain}>Play Again</button>
         <button className="btn-ghost"     onClick={onExit}>← Home</button>
       </div>
+
+      {roomContext && (
+        <RoomSubmitPanel
+          roomContext={roomContext}
+          mode="Rush Mode"
+          scoreValue={score}
+          scoreLabel={`${score} pts`}
+          scoreType="higher_is_better"
+          onBackToRoom={onExit}
+        />
+      )}
     </div>
   );
 }

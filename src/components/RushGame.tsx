@@ -9,11 +9,12 @@ import RushResultsScreen        from './RushResultsScreen';
 type RushScreen = 'intro' | 'countdown' | 'playing' | 'reveal' | 'results';
 
 interface Props {
-  playerName: string;
-  onExit:     () => void;
+  playerName:   string;
+  onExit:       () => void;
+  roomContext?: import('../types').RoomContext;
 }
 
-export default function RushGame({ playerName, onExit }: Props) {
+export default function RushGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }                = useBackgroundMusic();
   const [screen,          setScreen]          = useState<RushScreen>('intro');
   const [finalScore,      setFinalScore]      = useState(0);
@@ -90,6 +91,7 @@ export default function RushGame({ playerName, onExit }: Props) {
           playerName={playerName}
           onPlayAgain={handlePlayAgain}
           onExit={handleExit}
+          roomContext={roomContext}
         />
       )}
     </>

@@ -6,16 +6,17 @@ import ReproduceScreen   from './ReproduceScreen';
 import FeedbackScreen    from './FeedbackScreen';
 import TimeResultsScreen from './TimeResultsScreen';
 import { calcScore, randomTarget } from '../utils';
-import type { Round } from '../types';
+import type { Round, RoomContext } from '../types';
 
 type TimeScreen = 'start' | 'countdown' | 'observe' | 'reproduce' | 'feedback' | 'results';
 
 interface Props {
-  playerName: string;
-  onExit:     () => void;
+  playerName:   string;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
-export default function TimeGame({ playerName, onExit }: Props) {
+export default function TimeGame({ playerName, onExit, roomContext }: Props) {
   const [screen,        setScreen]        = useState<TimeScreen>('start');
   const [targets,       setTargets]       = useState<number[]>([]);
   const [rounds,        setRounds]        = useState<Round[]>([]);
@@ -107,6 +108,7 @@ export default function TimeGame({ playerName, onExit }: Props) {
           playerName={playerName}
           onPlayAgain={handleStart}
           onExit={onExit}
+          roomContext={roomContext}
         />
       )}
     </>

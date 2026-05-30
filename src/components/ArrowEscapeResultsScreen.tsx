@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { ArrowEscapeRoundResult } from '../types';
+import type { ArrowEscapeRoundResult, RoomContext } from '../types';
+import RoomSubmitPanel from './RoomSubmitPanel';
 
 interface Props {
-  rounds:      ArrowEscapeRoundResult[];
-  playerName:  string;
-  onPlayAgain: () => void;
-  onExit:      () => void;
+  rounds:       ArrowEscapeRoundResult[];
+  playerName:   string;
+  onPlayAgain:  () => void;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
 function getMessage(totalTime: number): string {
@@ -16,7 +18,7 @@ function getMessage(totalTime: number): string {
   return 'The arrows trapped you.';
 }
 
-export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAgain, onExit }: Props) {
+export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAgain, onExit, roomContext }: Props) {
   const [copied, setCopied] = useState(false);
   const totalTime  = rounds.reduce((s, r) => s + r.solveTime, 0);
   const totalSecs  = +totalTime.toFixed(1);
@@ -80,6 +82,17 @@ export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAga
         <button className="btn-secondary" onClick={onPlayAgain}>Play Again</button>
         <button className="btn-ghost"     onClick={onExit}>← Home</button>
       </div>
+
+      {roomContext && (
+        <RoomSubmitPanel
+          roomContext={roomContext}
+          mode="Arrow Escape"
+          scoreValue={totalSecs}
+          scoreLabel={`${totalSecs}s`}
+          scoreType="lower_is_better"
+          onBackToRoom={onExit}
+        />
+      )}
     </div>
   );
 }

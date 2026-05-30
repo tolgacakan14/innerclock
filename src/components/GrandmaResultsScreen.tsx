@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { GrandmaRoundResult } from '../types';
+import type { GrandmaRoundResult, RoomContext } from '../types';
+import RoomSubmitPanel from './RoomSubmitPanel';
 
 interface Props {
-  rounds:      GrandmaRoundResult[];
-  playerName:  string;
-  onPlayAgain: () => void;
-  onExit:      () => void;
+  rounds:       GrandmaRoundResult[];
+  playerName:   string;
+  onPlayAgain:  () => void;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
 function getMessage(total: number): string {
@@ -24,7 +26,7 @@ function buildCopyText(playerName: string, total: number): string {
   return `${base} Can you survive longer?`;
 }
 
-export default function GrandmaResultsScreen({ rounds, playerName, onPlayAgain, onExit }: Props) {
+export default function GrandmaResultsScreen({ rounds, playerName, onPlayAgain, onExit, roomContext }: Props) {
   const [copied, setCopied] = useState(false);
   const total   = rounds.reduce((s, r) => s + r.score, 0);
   const message = getMessage(total);
@@ -79,6 +81,17 @@ export default function GrandmaResultsScreen({ rounds, playerName, onPlayAgain, 
         <button className="btn-secondary" onClick={onPlayAgain}>Play Again</button>
         <button className="btn-ghost"     onClick={onExit}>← Home</button>
       </div>
+
+      {roomContext && (
+        <RoomSubmitPanel
+          roomContext={roomContext}
+          mode="Grandma Walking"
+          scoreValue={total}
+          scoreLabel={`${total} points`}
+          scoreType="higher_is_better"
+          onBackToRoom={onExit}
+        />
+      )}
     </div>
   );
 }

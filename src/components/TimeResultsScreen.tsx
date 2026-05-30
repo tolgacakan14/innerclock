@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { Round } from '../types';
+import type { Round, RoomContext } from '../types';
+import RoomSubmitPanel from './RoomSubmitPanel';
 
 interface Props {
-  rounds:      Round[];
-  playerName:  string;
-  onPlayAgain: () => void;
-  onExit:      () => void;
+  rounds:       Round[];
+  playerName:   string;
+  onPlayAgain:  () => void;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
 function getMessage(total: number): string {
@@ -16,7 +18,7 @@ function getMessage(total: number): string {
   return 'Your clock lost the rhythm.';
 }
 
-export default function TimeResultsScreen({ rounds, playerName, onPlayAgain, onExit }: Props) {
+export default function TimeResultsScreen({ rounds, playerName, onPlayAgain, onExit, roomContext }: Props) {
   const [copied, setCopied] = useState(false);
   const total   = rounds.reduce((s, r) => s + r.score, 0);
   const message = getMessage(total);
@@ -82,6 +84,17 @@ export default function TimeResultsScreen({ rounds, playerName, onPlayAgain, onE
         <button className="btn-secondary" onClick={onPlayAgain}>Play Again</button>
         <button className="btn-ghost" onClick={onExit}>← Home</button>
       </div>
+
+      {roomContext && (
+        <RoomSubmitPanel
+          roomContext={roomContext}
+          mode="Time Mode"
+          scoreValue={total}
+          scoreLabel={`${total} / 500`}
+          scoreType="higher_is_better"
+          onBackToRoom={onExit}
+        />
+      )}
     </div>
   );
 }

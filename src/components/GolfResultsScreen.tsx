@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { GolfRoundResult } from '../types';
+import type { GolfRoundResult, RoomContext } from '../types';
+import RoomSubmitPanel from './RoomSubmitPanel';
 
 interface Props {
-  rounds:      GolfRoundResult[];
-  playerName:  string;
-  onPlayAgain: () => void;
-  onExit:      () => void;
+  rounds:       GolfRoundResult[];
+  playerName:   string;
+  onPlayAgain:  () => void;
+  onExit:       () => void;
+  roomContext?: RoomContext;
 }
 
 function getMessage(total: number): string {
@@ -24,7 +26,7 @@ function buildCopyText(playerName: string, total: number): string {
   return `${base} Can you beat it?`;
 }
 
-export default function GolfResultsScreen({ rounds, playerName, onPlayAgain, onExit }: Props) {
+export default function GolfResultsScreen({ rounds, playerName, onPlayAgain, onExit, roomContext }: Props) {
   const [copied, setCopied] = useState(false);
   const total   = rounds.reduce((s, r) => s + r.shots, 0);
   const message = getMessage(total);
@@ -85,6 +87,17 @@ export default function GolfResultsScreen({ rounds, playerName, onPlayAgain, onE
         <button className="btn-secondary" onClick={onPlayAgain}>Play Again</button>
         <button className="btn-ghost"     onClick={onExit}>← Home</button>
       </div>
+
+      {roomContext && (
+        <RoomSubmitPanel
+          roomContext={roomContext}
+          mode="Golf Mode"
+          scoreValue={total}
+          scoreLabel={`${total} shots`}
+          scoreType="lower_is_better"
+          onBackToRoom={onExit}
+        />
+      )}
     </div>
   );
 }
