@@ -196,13 +196,56 @@ export async function getRoomWithStatus(roomId: string): Promise<RoomWithStatus 
 /**
  * Host selects a mode — persists to Supabase immediately.
  * Sets game_status = 'mode_selected' so non-hosts can see the selection.
+ *
+ * Fallback: if game_status column is missing, retries with selected_mode only.
  */
 export async function hostSelectMode(roomId: string, mode: string): Promise<void> {
+  console.log('[roomRounds] hostSelectMode →', { roomId, mode });
+
   const { error } = await supabase
     .from('rooms')
     .update({ selected_mode: mode, game_status: 'mode_selected' })
     .eq('id', roomId);
-  if (error) throw toError(error);
+
+  if (!error) {
+    console.log('[roomRounds] hostSelectMode succeeded');
+    return;
+  }
+
+  // Log every field so the caller can see exactly what Supabase returned
+  const pg = error as { message?: string; code?: string; details?: string; hint?: string };
+  console.error('[roomRounds] hostSelectMode error', {
+    message: pg.message,
+    code:    pg.code,
+    details: pg.details,
+    hint:    pg.hint,
+  });
+
+  const msg  = (pg.message ?? '').toLowerCase();
+  const code = pg.code ?? '';
+
+  // If the error is a missing column (PostgreSQL code 42703), retry without game_status
+  if (code === '42703' || msg.includes('column') || msg.includes('does not exist')) {
+    console.warn('[roomRounds] hostSelectMode: column missing — retrying with selected_mode only');
+    const { error: e2 } = await supabase
+      .from('rooms')
+      .update({ selected_mode: mode })
+      .eq('id', roomId);
+    if (e2) {
+      const pg2 = e2 as { message?: string; code?: string; details?: string; hint?: string };
+      console.error('[roomRounds] hostSelectMode fallback also failed', {
+        message: pg2.message,
+        code:    pg2.code,
+        details: pg2.details,
+        hint:    pg2.hint,
+      });
+      throw toError(e2);
+    }
+    console.log('[roomRounds] hostSelectMode fallback (selected_mode only) succeeded');
+    return;
+  }
+
+  throw toError(error);
 }
 
 /**
@@ -210,6 +253,7 @@ export async function hostSelectMode(roomId: string, mode: string): Promise<void
  * Sets selected_mode, game_status = 'countdown', countdown_starts_at = now + 3 s.
  */
 export async function hostStartGame(roomId: string, mode: string): Promise<void> {
+  console.log('[roomRounds] hostStartGame →', { roomId, mode });
   const startsAt = new Date(Date.now() + 3000).toISOString();
   const { error } = await supabase
     .from('rooms')
@@ -219,7 +263,12 @@ export async function hostStartGame(roomId: string, mode: string): Promise<void>
       countdown_starts_at: startsAt,
     })
     .eq('id', roomId);
-  if (error) throw toError(error);
+  if (error) {
+    const pg = error as { message?: string; code?: string; details?: string; hint?: string };
+    console.error('[roomRounds] hostStartGame error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
+    throw toError(error);
+  }
+  console.log('[roomRounds] hostStartGame succeeded');
 }
 
 /**
@@ -227,28 +276,40 @@ export async function hostStartGame(roomId: string, mode: string): Promise<void>
  * All players get a "Play Challenge" button immediately.
  */
 export async function hostStartChallenge(roomId: string): Promise<void> {
+  console.log('[roomRounds] hostStartChallenge →', { roomId });
   const { error } = await supabase
     .from('rooms')
     .update({ game_status: 'playing', countdown_starts_at: null })
     .eq('id', roomId);
-  if (error) throw toError(error);
+  if (error) {
+    const pg = error as { message?: string; code?: string; details?: string; hint?: string };
+    console.error('[roomRounds] hostStartChallenge error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
+    throw toError(error);
+  }
+  console.log('[roomRounds] hostStartChallenge succeeded');
 }
 
 /**
  * Called by host (or first client) when countdown reaches 0 — marks game live.
  */
 export async function setRoomPlaying(roomId: string): Promise<void> {
+  console.log('[roomRounds] setRoomPlaying →', { roomId });
   const { error } = await supabase
     .from('rooms')
     .update({ game_status: 'playing' })
     .eq('id', roomId);
-  if (error) throw toError(error);
+  if (error) {
+    const pg = error as { message?: string; code?: string; details?: string; hint?: string };
+    console.error('[roomRounds] setRoomPlaying error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
+    throw toError(error);
+  }
 }
 
 /**
  * Host resets room back to lobby state.
  */
 export async function resetRoom(roomId: string): Promise<void> {
+  console.log('[roomRounds] resetRoom →', { roomId });
   const { error } = await supabase
     .from('rooms')
     .update({
@@ -258,7 +319,12 @@ export async function resetRoom(roomId: string): Promise<void> {
       active_round_id:     null,
     })
     .eq('id', roomId);
-  if (error) throw toError(error);
+  if (error) {
+    const pg = error as { message?: string; code?: string; details?: string; hint?: string };
+    console.error('[roomRounds] resetRoom error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
+    throw toError(error);
+  }
+  console.log('[roomRounds] resetRoom succeeded');
 }
 
 // ── 5-Round party system ──────────────────────────────────────────────────────

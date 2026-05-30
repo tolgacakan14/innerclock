@@ -299,14 +299,25 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
   /** Host taps a mode card → persists selection to Supabase immediately */
   async function handleSelectMode(mode: GameMode) {
-    if (!isHost) return;
+    if (!isHost) {
+      console.warn('[RoomLobby] selectMode called but isHost=false — ignoring');
+      return;
+    }
+
+    console.log('[RoomLobby] selecting mode', mode);
+    console.log('[RoomLobby] room id', roomCtx.roomId);
+    console.log('[RoomLobby] isHost', isHost);
+    console.log('[RoomLobby] hostPlayerId', room?.host_player_id);
+
     setBusy(true); setActionErr('');
     try {
       await hostSelectMode(roomCtx.roomId, mode);
       await fetchAll();
     } catch (e) {
-      console.error('[RoomLobby] failed to select mode', e);
-      setActionErr('Could not select mode. Try again.');
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error('[RoomLobby] select mode error', e);
+      // Surface the actual DB error so it's visible in the UI
+      setActionErr(`Could not select mode: ${errMsg}`);
     } finally { setBusy(false); }
   }
 
