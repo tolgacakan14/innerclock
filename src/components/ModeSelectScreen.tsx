@@ -197,73 +197,209 @@ function GrandmaGraphic() {
 }
 
 function SequenceGraphic() {
+  // 3×2 grid — first 3 tiles are "lit" in the sequence, last 3 are dim
+  const COLORS = ['#FF453A','#FF9F0A','#30D158','#5AC8F5','#BF5AF2','#FFD60A'];
+  const LIT    = [0, 2, 4];  // tiles currently in the sequence (shown as step 1-2-3)
+  const litOrder = [1, 2, 3];
+
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
-      {/* 3×2 tile grid */}
+      {/* Dark field with radial glow */}
+      <rect x="0" y="0" width="100" height="100" fill="#08071A"/>
+      <radialGradient id="seqGlow" cx="50%" cy="48%" r="52%">
+        <stop offset="0%" stopColor="rgba(255,159,10,0.14)"/>
+        <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+      </radialGradient>
+      <rect x="0" y="0" width="100" height="100" fill="url(#seqGlow)"/>
+
+      {/* 3×2 tiles */}
       {[0,1,2].map(col => [0,1].map(row => {
-        const colors = ['#FF453A','#FF9F0A','#30D158','#5AC8F5','#BF5AF2','#FFD60A'];
-        const i = row * 3 + col;
-        const x = 12 + col * 28;
-        const y = 30 + row * 28;
+        const i   = row * 3 + col;
+        const x   = 9 + col * 28;
+        const y   = 18 + row * 30;
+        const lit = LIT.includes(i);
+        const seq = lit ? litOrder[LIT.indexOf(i)] : null;
+        const c   = COLORS[i];
+
         return (
-          <rect key={i} x={x} y={y} width="22" height="22" rx="4"
-            fill={colors[i]} opacity={i < 3 ? 0.85 : 0.30}
-            stroke={i < 3 ? 'rgba(255,255,255,0.30)' : 'none'} strokeWidth="1"/>
+          <g key={i}>
+            {/* Glow halo for lit tiles */}
+            {lit && (
+              <rect x={x-3} y={y-3} width={28} height={28} rx="9"
+                fill={c} opacity="0.18"/>
+            )}
+            {/* Tile body */}
+            <rect x={x} y={y} width={22} height={22} rx="6"
+              fill={lit ? c : 'rgba(255,255,255,0.055)'}
+              stroke={lit ? c : 'rgba(255,255,255,0.10)'}
+              strokeWidth={lit ? 0 : 1}
+              opacity={lit ? 0.90 : 1}
+            />
+            {/* Inner shine on lit tile */}
+            {lit && (
+              <rect x={x+2} y={y+2} width={18} height={7} rx="3"
+                fill="rgba(255,255,255,0.22)"/>
+            )}
+            {/* Sequence number */}
+            {seq !== null && (
+              <text x={x+11} y={y+15.5} textAnchor="middle"
+                fill="rgba(255,255,255,0.95)" fontSize="10" fontWeight="800"
+                fontFamily="system-ui,-apple-system,sans-serif">
+                {seq}
+              </text>
+            )}
+          </g>
         );
       }))}
-      {/* Sequence arrows */}
-      <text x="16" y="26" fill="rgba(255,255,255,0.50)" fontSize="7">1</text>
-      <text x="44" y="26" fill="rgba(255,255,255,0.50)" fontSize="7">2</text>
-      <text x="72" y="26" fill="rgba(255,255,255,0.50)" fontSize="7">3</text>
-      <text x="50" y="94" textAnchor="middle" fill="rgba(255,255,255,0.40)" fontSize="8">Repeat the sequence</text>
+
+      {/* Connecting dashes between step 1→2→3 */}
+      <line x1="31" y1="29" x2="38" y2="44" stroke="rgba(255,255,255,0.25)" strokeWidth="1.2" strokeDasharray="2.5 2"/>
+      <line x1="53" y1="44" x2="66" y2="29" stroke="rgba(255,255,255,0.25)" strokeWidth="1.2" strokeDasharray="2.5 2"/>
+
+      {/* "…" hint */}
+      <text x="50" y="86" textAnchor="middle"
+        fill="rgba(255,159,10,0.65)" fontSize="7.5" fontWeight="700"
+        fontFamily="system-ui,-apple-system,sans-serif"
+        letterSpacing="3">
+        · · ·
+      </text>
+      <text x="50" y="96" textAnchor="middle"
+        fill="rgba(255,255,255,0.28)" fontSize="6.5"
+        fontFamily="system-ui,-apple-system,sans-serif">
+        Watch · Repeat
+      </text>
     </svg>
   );
 }
 
 function MemoryGridGraphic() {
+  // 4×4 grid — 5 cells are "lit" (the ones to memorise)
+  const LIT = new Set([1, 5, 6, 10, 14]);
+
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
-      {/* 3×3 grid */}
-      {Array.from({length: 9}, (_, i) => {
-        const row = Math.floor(i / 3);
-        const col = i % 3;
-        const lit = [1, 4, 7].includes(i);
+      {/* Background with blue tint */}
+      <rect x="0" y="0" width="100" height="100" fill="#060D1C"/>
+      <radialGradient id="memGlow" cx="50%" cy="45%" r="50%">
+        <stop offset="0%" stopColor="rgba(90,200,245,0.12)"/>
+        <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+      </radialGradient>
+      <rect x="0" y="0" width="100" height="100" fill="url(#memGlow)"/>
+
+      {/* 4×4 grid */}
+      {Array.from({length: 16}, (_, i) => {
+        const row = Math.floor(i / 4);
+        const col = i % 4;
+        const lit = LIT.has(i);
+        const x   = 8 + col * 22;
+        const y   = 10 + row * 22;
         return (
-          <rect key={i}
-            x={14 + col * 25} y={14 + row * 25} width="20" height="20" rx="3"
-            fill={lit ? 'rgba(90,200,245,0.82)' : 'rgba(255,255,255,0.08)'}
-            stroke={lit ? 'rgba(90,200,245,0.55)' : 'rgba(255,255,255,0.12)'} strokeWidth="1"
-          />
+          <g key={i}>
+            {lit && (
+              <rect x={x-2} y={y-2} width={22} height={22} rx="6"
+                fill="rgba(90,200,245,0.18)"/>
+            )}
+            <rect x={x} y={y} width={18} height={18} rx="4"
+              fill={lit ? 'rgba(90,200,245,0.78)' : 'rgba(255,255,255,0.055)'}
+              stroke={lit ? 'rgba(90,200,245,0.90)' : 'rgba(255,255,255,0.09)'}
+              strokeWidth="1"
+            />
+            {lit && (
+              <rect x={x+1} y={y+1} width={16} height={6} rx="2"
+                fill="rgba(255,255,255,0.24)"/>
+            )}
+          </g>
         );
       })}
-      {/* Question mark — memory cue */}
-      <text x="50" y="94" textAnchor="middle" fill="rgba(255,255,255,0.40)" fontSize="8">Remember them all</text>
+
+      {/* Flash overlay effect on lit cells */}
+      <rect x="0" y="0" width="100" height="100" fill="rgba(90,200,245,0.03)"/>
+
+      {/* Bottom label */}
+      <text x="50" y="96" textAnchor="middle"
+        fill="rgba(90,200,245,0.55)" fontSize="6.5" fontWeight="600"
+        fontFamily="system-ui,-apple-system,sans-serif"
+        letterSpacing="0.5">
+        REMEMBER · RECALL
+      </text>
     </svg>
   );
 }
 
 function TapTimingGraphic() {
+  // Marker sitting just inside the perfect zone, about to reach center
+  const markerX = 54;
+
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
-      {/* Timing bar background */}
-      <rect x="8" y="42" width="84" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
-      {/* Good zone */}
-      <rect x="22" y="42" width="56" height="14" rx="6" fill="rgba(255,159,10,0.30)"/>
-      {/* Perfect zone */}
-      <rect x="38" y="42" width="24" height="14" rx="5" fill="rgba(48,209,88,0.55)"/>
-      {/* Center line */}
-      <line x1="50" y1="38" x2="50" y2="60" stroke="rgba(48,209,88,0.70)" strokeWidth="1.5"/>
-      {/* Moving marker */}
-      <circle cx="46" cy="49" r="6" fill="rgba(255,255,255,0.95)"
-        stroke="rgba(48,209,88,0.80)" strokeWidth="2"/>
-      {/* Labels */}
-      <text x="50" y="32" textAnchor="middle" fill="rgba(48,209,88,0.80)" fontSize="6.5" fontWeight="700">PERFECT</text>
-      <text x="26" y="76" textAnchor="middle" fill="rgba(255,159,10,0.70)" fontSize="5.5">GOOD</text>
-      <text x="74" y="76" textAnchor="middle" fill="rgba(255,159,10,0.70)" fontSize="5.5">GOOD</text>
-      <text x="50" y="90" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="7">Tap on the beat</text>
+      {/* Background with green glow */}
+      <rect x="0" y="0" width="100" height="100" fill="#050D0A"/>
+      <radialGradient id="ttGlow" cx="50%" cy="52%" r="40%">
+        <stop offset="0%" stopColor="rgba(48,209,88,0.14)"/>
+        <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+      </radialGradient>
+      <rect x="0" y="0" width="100" height="100" fill="url(#ttGlow)"/>
+
+      {/* ── Score / combo hint at top ── */}
+      <text x="50" y="22" textAnchor="middle"
+        fill="rgba(255,214,10,0.80)" fontSize="11" fontWeight="800"
+        fontFamily="system-ui,-apple-system,sans-serif"
+        letterSpacing="-0.5">
+        x3 COMBO
+      </text>
+      <text x="50" y="33" textAnchor="middle"
+        fill="rgba(48,209,88,0.70)" fontSize="7.5" fontWeight="700"
+        fontFamily="system-ui,-apple-system,sans-serif">
+        +30 pts
+      </text>
+
+      {/* ── Timing bar ── */}
+      {/* Bar background */}
+      <rect x="6" y="44" width="88" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.10)" strokeWidth="0.8"/>
+      {/* Good zone (amber) */}
+      <rect x="18" y="44" width="64" height="16" rx="7" fill="rgba(255,159,10,0.20)"/>
+      {/* Perfect zone (green) */}
+      <rect x="35" y="44" width="30" height="16" rx="6" fill="rgba(48,209,88,0.35)"/>
+      {/* Perfect zone inner glow */}
+      <rect x="36" y="45" width="28" height={6} rx="3" fill="rgba(48,209,88,0.22)"/>
+
+      {/* Center guide line */}
+      <line x1="50" y1="40" x2="50" y2="64"
+        stroke="rgba(48,209,88,0.60)" strokeWidth="1.5" strokeLinecap="round"/>
+
+      {/* Marker shadow */}
+      <ellipse cx={markerX} cy="66" rx="6" ry="2.5" fill="rgba(0,0,0,0.35)"/>
+      {/* Marker body */}
+      <circle cx={markerX} cy="52" r="7.5"
+        fill="white"
+        style={{ filter: 'drop-shadow(0 0 5px rgba(48,209,88,0.70))' }}
+      />
+      {/* Marker inner ring */}
+      <circle cx={markerX} cy="52" r="4" fill="rgba(48,209,88,0.80)"/>
+
+      {/* Zone labels */}
+      <text x="28" y="74" textAnchor="middle"
+        fill="rgba(255,159,10,0.65)" fontSize="5.5" fontWeight="600"
+        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.3">
+        GOOD
+      </text>
+      <text x="50" y="74" textAnchor="middle"
+        fill="rgba(48,209,88,0.80)" fontSize="5.5" fontWeight="700"
+        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.3">
+        PERFECT
+      </text>
+      <text x="72" y="74" textAnchor="middle"
+        fill="rgba(255,159,10,0.65)" fontSize="5.5" fontWeight="600"
+        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.3">
+        GOOD
+      </text>
+
+      {/* Tap cue */}
+      <text x="50" y="92" textAnchor="middle"
+        fill="rgba(255,255,255,0.30)" fontSize="6.5"
+        fontFamily="system-ui,-apple-system,sans-serif">
+        Tap at the perfect moment
+      </text>
     </svg>
   );
 }

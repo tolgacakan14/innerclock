@@ -4565,6 +4565,179 @@ body {
   padding: 0 12px 16px;
 }
 
+/* ── Current player highlight in player list ───────────────────────────────── */
+.room-player-row--you {
+  background: rgba(48,209,88,0.06);
+  border: 1px solid rgba(48,209,88,0.15);
+}
+
+/* ── Mode Selected display (non-host) ──────────────────────────────────────── */
+.lobby-mode-selected-display {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(48,209,88,0.08);
+  border: 1px solid rgba(48,209,88,0.22);
+  border-radius: 14px;
+  padding: 14px 16px;
+  width: 100%;
+}
+.lobby-mode-selected-icon { font-size: 2rem; flex-shrink: 0; }
+.lobby-mode-selected-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 2px;
+}
+.lobby-mode-selected-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+/* ── Host challenge start panel ────────────────────────────────────────────── */
+.lobby-challenge-start-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(48,209,88,0.06);
+  border: 1px solid rgba(48,209,88,0.18);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.lobby-challenge-selected-label {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.65);
+  margin: 0;
+}
+.lobby-challenge-selected-label strong {
+  color: rgba(255,255,255,0.90);
+}
+.lobby-challenge-start-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* "Pick a mode" hint */
+.lobby-no-mode-hint {
+  font-size: 0.80rem;
+  color: rgba(255,255,255,0.30);
+  text-align: center;
+  margin: 4px 0 0;
+}
+
+/* ── Challenge active panel ─────────────────────────────────────────────────── */
+.lobby-challenge-active-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  background: rgba(48,209,88,0.07);
+  border: 1px solid rgba(48,209,88,0.22);
+  border-radius: 16px;
+  padding: 16px;
+}
+.lobby-play-challenge-btn {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  height: 54px !important;
+  background: linear-gradient(135deg, rgba(48,209,88,0.85), rgba(30,175,70,0.85)) !important;
+  box-shadow: 0 4px 20px rgba(48,209,88,0.30) !important;
+}
+.lobby-play-challenge-btn:active { transform: scale(0.97) !important; }
+.lobby-challenge-active-hint {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.42);
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Challenge leaderboard ──────────────────────────────────────────────────── */
+.lobby-challenge-board {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.lobby-challenge-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.lobby-challenge-board-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.70);
+}
+.lobby-challenge-board-hint {
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.28);
+  font-weight: 600;
+}
+.lobby-challenge-board-empty {
+  font-size: 0.80rem;
+  color: rgba(255,255,255,0.30);
+  text-align: center;
+  padding: 18px 16px;
+  margin: 0;
+}
+.lobby-challenge-board-list {
+  display: flex;
+  flex-direction: column;
+}
+.lobby-challenge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.12s;
+}
+.lobby-challenge-row:last-child { border-bottom: none; }
+.lobby-challenge-row--podium { background: rgba(255,255,255,0.02); }
+.lobby-challenge-row--you {
+  background: rgba(48,209,88,0.06);
+}
+.lobby-challenge-rank {
+  font-size: 0.95rem;
+  min-width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.lobby-challenge-player {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-challenge-score {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgba(48,209,88,0.90);
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Host controls footer in challenge section */
+.lobby-host-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 /* ── Scoreboard mobile tab fix ─────────────────────────────────────────────── */
 /* Wrapper breaks out of the screen's overflow-x:hidden clip */
 .sb-tabs-wrap {

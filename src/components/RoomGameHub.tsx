@@ -35,7 +35,9 @@ type HubView =
 export default function RoomGameHub() {
   const { roomCode }  = useParams<{ roomCode: string }>();
   const navigate      = useNavigate();
-  const code          = (roomCode ?? '').toUpperCase();
+
+  // Normalize the code: trim, uppercase, remove all whitespace
+  const normalizedCode = (roomCode ?? '').trim().toUpperCase().replace(/\s+/g, '');
 
   const [view,    setView]    = useState<HubView>('loading');
   const [roomCtx, setRoomCtx] = useState<RoomContext | null>(null);
@@ -44,38 +46,74 @@ export default function RoomGameHub() {
   const [roundId,     setRoundId]     = useState<string | undefined>();
   const [roundNumber, setRoundNumber] = useState<number | undefined>();
 
-  // ── Bootstrap: load or fetch room ─────────────────────────────────────────
+  // ── Bootstrap: validate room then decide view ──────────────────────────────
   useEffect(() => {
-    if (!code) { setView('not-found'); return; }
+    console.log('[RoomHub] route roomCode', roomCode);
+    console.log('[RoomHub] normalized roomCode', normalizedCode);
 
-    const saved = loadRoomPlayer(code);
-    if (saved) {
-      setRoomCtx(saved);
-      setView('lobby');
+    if (!normalizedCode) {
+      console.warn('[RoomHub] empty room code — showing not-found');
+      setView('not-found');
       return;
     }
 
     (async () => {
-      const { data: room, error } = await supabase
+      // 1. Always verify room exists in Supabase (don't trust URL alone)
+      const { data: room, error: roomErr } = await supabase
         .from('rooms')
         .select('id, room_code, room_name')
-        .eq('room_code', code)
+        .eq('room_code', normalizedCode)
         .single();
 
-      if (error || !room) {
-        console.error('[RoomGameHub] room check error:', error);
+      console.log('[RoomHub] room fetch result', room);
+      if (roomErr) console.error('[RoomHub] room fetch error', roomErr);
+
+      if (roomErr || !room) {
         setView('not-found');
         return;
       }
 
-      console.log('[RoomGameHub] room confirmed:', room.room_code);
+      // 2. Check localStorage for an existing player context
+      const saved = loadRoomPlayer(normalizedCode);
+
+      if (saved && saved.roomId === room.id) {
+        // 3. Validate saved player still exists in the DB
+        const { data: playerCheck, error: playerErr } = await supabase
+          .from('players')
+          .select('id')
+          .eq('id', saved.playerId)
+          .single();
+
+        if (playerErr) {
+          console.warn('[RoomHub] saved player validation failed — forcing re-join', playerErr);
+        }
+
+        if (playerCheck) {
+          // Player is valid — go straight to lobby
+          console.log('[RoomHub] valid saved session found, entering lobby');
+          setRoomCtx(saved);
+          setView('lobby');
+          return;
+        }
+
+        // Player row is gone — clear stale cache and re-join
+        console.warn('[RoomHub] stale player in localStorage — clearing and re-joining');
+        clearRoomPlayer(normalizedCode);
+      } else if (saved) {
+        // Saved context is for a different room — clear it
+        console.warn('[RoomHub] localStorage roomId mismatch — clearing');
+        clearRoomPlayer(normalizedCode);
+      }
+
+      // No valid session — show join form
       setView('setup');
     })();
-  }, [code]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedCode]);
 
   // ── After JoinRoomScreen completes ────────────────────────────────────────
   function handleSetupDone() {
-    const saved = loadRoomPlayer(code);
+    const saved = loadRoomPlayer(normalizedCode);
     if (saved) {
       setRoomCtx(saved);
       setView('lobby');
@@ -86,7 +124,7 @@ export default function RoomGameHub() {
 
   // ── Leave room ─────────────────────────────────────────────────────────────
   function handleLeave() {
-    clearRoomPlayer(code);
+    clearRoomPlayer(normalizedCode);
     navigate('/');
   }
 
@@ -118,7 +156,7 @@ export default function RoomGameHub() {
     return (
       <div className="screen room-loading-screen">
         <div className="room-loading-spinner" aria-label="Loading room…" />
-        <p className="room-loading-text">Joining room…</p>
+        <p className="room-loading-text">Loading room…</p>
       </div>
     );
   }
@@ -129,7 +167,9 @@ export default function RoomGameHub() {
       <div className="screen room-notfound-screen">
         <span className="room-notfound-icon">🔍</span>
         <h2 className="room-notfound-title">Room not found</h2>
-        <p className="room-notfound-sub">The code <strong>{code}</strong> doesn't match any active room.</p>
+        <p className="room-notfound-sub">
+          The code <strong>{normalizedCode}</strong> doesn't match any active room.
+        </p>
         <button className="btn-primary" onClick={() => navigate('/')}>
           ← Back to Home
         </button>
@@ -141,7 +181,7 @@ export default function RoomGameHub() {
   if (view === 'setup') {
     return (
       <JoinRoomScreen
-        initialCode={code}
+        initialCode={normalizedCode}
         onBack={() => navigate('/')}
         onJoined={handleSetupDone}
       />
@@ -263,7 +303,7 @@ export default function RoomGameHub() {
   if (view === 'timing') {
     return (
       <TapTimingGame
-        key={`rt-${roomCtx.roomCode}-${roundId ?? 'free'}`}
+        key={`rtt-${roomCtx.roomCode}-${roundId ?? 'free'}`}
         playerName={roomCtx.playerName}
         onExit={exitToLobby}
         roomContext={ctxWithRound}

@@ -8,9 +8,9 @@ export type RoundStatus = 'waiting' | 'active' | 'completed';
 /** All possible game_status values on the rooms table. */
 export type GameStatus =
   | 'waiting'         // lobby — no game in progress
-  | 'mode_selected'   // (reserved) host picked mode but hasn't started
+  | 'mode_selected'   // host picked mode, waiting for start
   | 'countdown'       // 3-2-1-GO synced countdown in progress
-  | 'playing'         // game is live (set by host after countdown)
+  | 'playing'         // challenge is live (async competitive)
   | 'round_completed' // one round finished
   | 'active'          // legacy: 5-round party system in progress
   | 'completed';      // whole party done
@@ -72,6 +72,19 @@ export const MODE_LABELS_FULL: Record<string, string> = {
   timing:      'Tap Timing',
 };
 
+/** The mode string stored in the scores table for each game mode key. */
+export const MODE_SCORE_LABEL: Record<string, string> = {
+  rush:        'Rush Mode',
+  color:       'Colour Mode',
+  golf:        'Golf Mode',
+  grandma:     'Grandma Walking',
+  arrowEscape: 'Arrow Escape',
+  time:        'Time Mode',
+  sequence:    'Sequence Tap',
+  memory:      'Memory Grid',
+  timing:      'Tap Timing',
+};
+
 export const MODE_ICONS: Record<string, string> = {
   rush:        '⚡',
   color:       '🎨',
@@ -83,6 +96,9 @@ export const MODE_ICONS: Record<string, string> = {
   memory:      '🧠',
   timing:      '🎯',
 };
+
+/** Modes where lower score is better (shots, seconds). */
+export const LOWER_IS_BETTER = new Set(['golf', 'arrowEscape']);
 
 // ── Error helper ──────────────────────────────────────────────────────────────
 function toError(e: unknown): Error {
@@ -108,7 +124,13 @@ export async function getLobbyPlayers(roomId: string): Promise<LobbyPlayerRow[]>
 
 // ── Room status ───────────────────────────────────────────────────────────────
 
+/**
+ * Fetch room with all status columns.
+ * Falls back to basic room data if extended columns don't exist in the schema yet.
+ * This ensures the lobby still loads even if the SQL migration hasn't been run.
+ */
 export async function getRoomWithStatus(roomId: string): Promise<RoomWithStatus | null> {
+  // Try full schema first
   const { data, error } = await supabase
     .from('rooms')
     .select(
@@ -117,19 +139,60 @@ export async function getRoomWithStatus(roomId: string): Promise<RoomWithStatus 
     )
     .eq('id', roomId)
     .single();
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw toError(error);
+
+  if (!error) {
+    return data as unknown as RoomWithStatus;
   }
-  return data as unknown as RoomWithStatus;
+
+  // If PGRST116, room simply doesn't exist
+  if ((error as { code?: string }).code === 'PGRST116') {
+    return null;
+  }
+
+  // Extended columns may not exist yet — fall back to basic select
+  console.warn('[roomRounds] getRoomWithStatus full select failed, falling back to basic:', error.message);
+
+  const { data: basic, error: basicErr } = await supabase
+    .from('rooms')
+    .select('id, room_code, room_name')
+    .eq('id', roomId)
+    .single();
+
+  if (basicErr) {
+    if ((basicErr as { code?: string }).code === 'PGRST116') return null;
+    throw toError(basicErr);
+  }
+  if (!basic) return null;
+
+  // Return a RoomWithStatus with defaults for missing columns
+  return {
+    ...(basic as { id: string; room_code: string; room_name: string }),
+    host_player_id:       null,
+    game_status:          'waiting',
+    selected_mode:        null,
+    countdown_starts_at:  null,
+    active_round_id:      null,
+    current_round_number: null,
+  } as RoomWithStatus;
 }
 
 // ── Synchronized single-round game flow ───────────────────────────────────────
 
 /**
- * Host starts a synchronized game.
+ * Host selects a mode — persists to Supabase immediately.
+ * Sets game_status = 'mode_selected' so non-hosts can see the selection.
+ */
+export async function hostSelectMode(roomId: string, mode: string): Promise<void> {
+  const { error } = await supabase
+    .from('rooms')
+    .update({ selected_mode: mode, game_status: 'mode_selected' })
+    .eq('id', roomId);
+  if (error) throw toError(error);
+}
+
+/**
+ * Host starts a synchronized game with a 3-2-1-GO countdown.
  * Sets selected_mode, game_status = 'countdown', countdown_starts_at = now + 3 s.
- * All clients read this and show the same countdown.
  */
 export async function hostStartGame(roomId: string, mode: string): Promise<void> {
   const startsAt = new Date(Date.now() + 3000).toISOString();
@@ -145,8 +208,19 @@ export async function hostStartGame(roomId: string, mode: string): Promise<void>
 }
 
 /**
+ * Host starts a challenge without a countdown (async competitive mode).
+ * All players get a "Play Challenge" button immediately.
+ */
+export async function hostStartChallenge(roomId: string): Promise<void> {
+  const { error } = await supabase
+    .from('rooms')
+    .update({ game_status: 'playing', countdown_starts_at: null })
+    .eq('id', roomId);
+  if (error) throw toError(error);
+}
+
+/**
  * Called by host (or first client) when countdown reaches 0 — marks game live.
- * Prevents late-joining clients from auto-launching into a stale countdown.
  */
 export async function setRoomPlaying(roomId: string): Promise<void> {
   const { error } = await supabase
@@ -180,7 +254,16 @@ export async function getRoomRounds(roomId: string): Promise<RoundRow[]> {
     .select('*')
     .eq('room_id', roomId)
     .order('round_number', { ascending: true });
-  if (error) throw toError(error);
+
+  if (error) {
+    // If the table doesn't exist yet, return empty rather than crashing
+    const msg = (error as { message?: string }).message ?? '';
+    if (msg.includes('does not exist') || msg.includes('relation')) {
+      console.warn('[roomRounds] room_rounds table not found — returning empty');
+      return [];
+    }
+    throw toError(error);
+  }
   return (data ?? []) as RoundRow[];
 }
 
