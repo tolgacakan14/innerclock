@@ -12,6 +12,7 @@ import {
   hostStartChallenge,
   setRoomPlaying,
   resetRoom,
+  repairHostPlayerId,
   startPartyGame,
   startRound,
   completeRound,
@@ -88,15 +89,13 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
   const pollRef         = useRef<ReturnType<typeof setInterval> | null>(null);
   const cdTickRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const onPlayModeRef   = useRef(onPlayMode);
+  const selfHealRef     = useRef(false);
   const inviteUrl       = `${window.location.origin}/room/${roomCtx.roomCode}`;
 
   useEffect(() => { onPlayModeRef.current = onPlayMode; }, [onPlayMode]);
 
   // ── Data fetching ─────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
-    console.log('[RoomHub] route roomCode', roomCtx.roomCode);
-    console.log('[RoomHub] normalized roomCode', roomCtx.roomCode);
-
     const [pResult, rResult, rdsResult, scResult] = await Promise.allSettled([
       getLobbyPlayers(roomCtx.roomId),
       getRoomWithStatus(roomCtx.roomId),
@@ -106,7 +105,6 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
     // Players
     if (pResult.status === 'fulfilled') {
-      console.log('[RoomHub] players result', pResult.value.map(x => x.player_name));
       setPlayers(pResult.value);
     } else {
       console.error('[RoomHub] players fetch error', pResult.reason);
@@ -114,7 +112,6 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
     // Room status
     if (rResult.status === 'fulfilled') {
-      console.log('[RoomHub] room fetch result', rResult.value);
       setRoom(rResult.value);
       setLoadErr('');
     } else {
@@ -124,6 +121,18 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
         setLoadErr('Could not load room. Retrying…');
       }
     }
+
+    // Debug identity info
+    const fetchedRoom = rResult.status === 'fulfilled' ? rResult.value : null;
+    const fetchedPlayers = pResult.status === 'fulfilled' ? pResult.value : [];
+    const currentPlayer = fetchedPlayers.find(p => p.id === roomCtx.playerId) ?? null;
+    console.log('[RoomHub] room', fetchedRoom);
+    console.log('[RoomHub] players', fetchedPlayers.map(p => p.player_name));
+    console.log('[RoomHub] currentPlayer', currentPlayer);
+    console.log('[RoomHub] currentPlayerId', roomCtx.playerId);
+    console.log('[RoomHub] hostPlayerId (DB)', fetchedRoom?.host_player_id ?? null);
+    console.log('[RoomHub] isHost (DB match)', fetchedRoom?.host_player_id === roomCtx.playerId);
+    console.log('[RoomHub] local identity', { playerId: roomCtx.playerId, isHost: roomCtx.isHost });
 
     // Room rounds (non-critical)
     if (rdsResult.status === 'fulfilled') {
@@ -141,7 +150,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
     }
 
     setLoading(false);
-  }, [roomCtx.roomId, roomCtx.playerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomCtx.roomId, roomCtx.playerId, roomCtx.isHost]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchAll();
@@ -176,7 +185,9 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
         hasLaunchedRef.current = true;
         if (cdTickRef.current) { clearInterval(cdTickRef.current); cdTickRef.current = null; }
 
-        if (room?.host_player_id === roomCtx.playerId) {
+        // Use both DB and localStorage fallback to decide who calls setRoomPlaying
+        const amHost = (room?.host_player_id === roomCtx.playerId) || (roomCtx.isHost === true && !room?.host_player_id);
+        if (amHost) {
           setRoomPlaying(roomCtx.roomId).catch(err =>
             console.error('[RoomLobby] failed to set playing state', err),
           );
@@ -196,8 +207,32 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.game_status, room?.countdown_starts_at, room?.selected_mode]);
 
+  // ── Host identity: multi-layer detection ─────────────────────────────────
+  // Primary: DB is authoritative source of truth
+  const isHostByDB    = Boolean(room?.host_player_id && room.host_player_id === roomCtx.playerId);
+  // Fallback: localStorage flag, ONLY when DB has no host recorded yet
+  const isHostByLocal = roomCtx.isHost === true && !room?.host_player_id;
+  const isHost        = isHostByDB || isHostByLocal;
+  // Canonical host player ID for badge display (covers both DB and fallback)
+  const hostPlayerId  = room?.host_player_id ?? (isHostByLocal ? roomCtx.playerId : null);
+
+  // ── Self-heal: write host_player_id to DB if localStorage says isHost ───
+  useEffect(() => {
+    // Only run once, only when DB has no host and localStorage says we are host
+    if (!isHostByLocal || selfHealRef.current || room === null) return;
+    selfHealRef.current = true;
+    repairHostPlayerId(roomCtx.roomId, roomCtx.playerId)
+      .then(() => {
+        console.log('[RoomLobby] self-heal: host_player_id repaired in DB');
+        fetchAll();
+      })
+      .catch(err => {
+        console.warn('[RoomLobby] self-heal failed (column may not exist yet):', err.message);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHostByLocal, room]);
+
   // ── Derived ────────────────────────────────────────────────────────────────
-  const isHost      = Boolean(room?.host_player_id && room.host_player_id === roomCtx.playerId);
   const gs          = room?.game_status ?? 'waiting';
   const selectedMode = room?.selected_mode ?? null;
   const activeRound = rounds.find(r => r.status === 'active');
@@ -423,8 +458,8 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
               <div key={p.id} className={`room-player-row${p.id === roomCtx.playerId ? ' room-player-row--you' : ''}`}>
                 <span className="room-player-name">{p.player_name}</span>
                 <div className="room-player-badges">
-                  {p.id === room?.host_player_id && <span className="room-badge room-badge--host">Host</span>}
-                  {p.id === roomCtx.playerId       && <span className="room-badge room-badge--you">You</span>}
+                  {p.id === hostPlayerId       && <span className="room-badge room-badge--host">Host</span>}
+                  {p.id === roomCtx.playerId   && <span className="room-badge room-badge--you">You</span>}
                 </div>
               </div>
             ))}

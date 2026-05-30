@@ -132,10 +132,15 @@ export default function CreateRoomScreen({ onBack, onCreated }: Props) {
 
     // ── Step 3: set host_player_id on the room ────────────────────────────
     // Best-effort — non-fatal if this column doesn't exist yet
-    await supabase
+    const { error: hostErr } = await supabase
       .from('rooms')
       .update({ host_player_id: player.id })
       .eq('id', room.id);
+    if (hostErr) {
+      console.error('[CreateRoom] host_player_id set failed:', hostErr.message, hostErr.code);
+    } else {
+      console.log('[CreateRoom] host_player_id set', player.id);
+    }
 
     // ── Step 4: persist locally and navigate ──────────────────────────────
     const ctx = {
@@ -144,8 +149,11 @@ export default function CreateRoomScreen({ onBack, onCreated }: Props) {
       roomName:   room.room_name,
       playerId:   player.id,
       playerName: player.player_name,
+      isHost:     true,   // Stored as fallback for when host_player_id column is missing
     };
     saveRoomPlayer(ctx);
+    console.log('[CreateRoom] room created', room);
+    console.log('[CreateRoom] creator player created', player);
     localStorage.setItem('kroneName', pName);
     onCreated(room.room_code);
   }

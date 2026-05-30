@@ -7,6 +7,8 @@ export interface RoomContext {
   roomName:   string;
   playerId:   string;
   playerName: string;
+  /** True when this player created the room. Persisted in localStorage as fallback. */
+  isHost?:      boolean;
   /** Set when playing inside a party round — not persisted to localStorage. */
   roundId?:     string;
   roundNumber?: number;

@@ -110,6 +110,21 @@ function toError(e: unknown): Error {
   return new Error(String(e));
 }
 
+// ── Host repair ───────────────────────────────────────────────────────────────
+
+/**
+ * Repair host_player_id when it is null (e.g. column was just added by migration).
+ * Uses .is('host_player_id', null) so it NEVER overwrites a valid existing host.
+ */
+export async function repairHostPlayerId(roomId: string, playerId: string): Promise<void> {
+  const { error } = await supabase
+    .from('rooms')
+    .update({ host_player_id: playerId })
+    .eq('id', roomId)
+    .is('host_player_id', null); // only when null — never steal host
+  if (error) throw toError(error);
+}
+
 // ── Players ───────────────────────────────────────────────────────────────────
 
 export async function getLobbyPlayers(roomId: string): Promise<LobbyPlayerRow[]> {
