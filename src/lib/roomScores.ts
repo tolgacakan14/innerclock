@@ -48,9 +48,13 @@ export async function getRoomByCode(code: string): Promise<RoomRow | null> {
     .from('rooms')
     .select('*')
     .eq('room_code', code.trim().toUpperCase())
-    .maybeSingle();
-  if (error) throw error;
-  return (data ?? null) as RoomRow | null;
+    .single();
+  // PGRST116 = "no rows returned" — treat as not found, not an error
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return data as RoomRow | null;
 }
 
 export async function createRoom(roomName: string): Promise<RoomRow> {

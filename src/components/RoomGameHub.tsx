@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { RoomContext }         from '../types';
-import { getRoomByCode, createPlayer } from '../lib/roomScores';
-import { loadRoomPlayer, saveRoomPlayer, clearRoomPlayer } from '../lib/roomStorage';
+import { supabase }                 from '../lib/supabase';
+import { loadRoomPlayer, clearRoomPlayer } from '../lib/roomStorage';
 import RoomLobbyScreen   from './RoomLobbyScreen';
 import JoinRoomScreen    from './JoinRoomScreen';
 import TimeGame          from './TimeGame';
@@ -36,7 +36,7 @@ export default function RoomGameHub() {
   useEffect(() => {
     if (!code) { setView('not-found'); return; }
 
-    // Try localStorage first
+    // 1. Try localStorage first (fast path — no network needed)
     const saved = loadRoomPlayer(code);
     if (saved) {
       setRoomCtx(saved);
@@ -44,15 +44,24 @@ export default function RoomGameHub() {
       return;
     }
 
-    // Fetch room from Supabase to confirm it exists
-    getRoomByCode(code)
-      .then(room => {
-        if (!room) { setView('not-found'); return; }
-        // Room exists but no local identity — show setup
-        setView('setup');
-      })
-      .catch(() => setView('not-found'));
-  }, [code]);
+    // 2. Confirm room exists in Supabase before showing setup form
+    (async () => {
+      const { data: room, error } = await supabase
+        .from('rooms')
+        .select('id, room_code, room_name')
+        .eq('room_code', code)
+        .single();
+
+      if (error || !room) {
+        console.error('[RoomGameHub] room check error:', error);
+        setView('not-found');
+        return;
+      }
+
+      console.log('[RoomGameHub] room confirmed:', room.room_code);
+      setView('setup');
+    })();
+  }, [code]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Called after JoinRoomScreen completes inside the hub ──────────────────
   function handleSetupDone() {
