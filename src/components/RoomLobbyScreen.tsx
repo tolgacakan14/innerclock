@@ -457,13 +457,12 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
     pausePoll();
     setBusy(true); setActionErr('');
     try {
-      await resetRoom(roomCtx.roomId);
+      // resetRoom returns the full confirmed row — apply it immediately so
+      // selected_mode / countdown_starts_at / active_round_id are cleared
+      // in the UI without waiting for the next 2-second poll.
+      const confirmedRoom = await resetRoom(roomCtx.roomId);
       hasLaunchedRef.current = false;
-      setRoom(prev => prev ? {
-        ...prev,
-        game_status:  'waiting' as GameStatus,
-        selected_mode: null,
-      } : prev);
+      setRoom(confirmedRoom);
       fetchAll();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);

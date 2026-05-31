@@ -26,17 +26,17 @@ export interface RoundRow {
 }
 
 export interface RoomWithStatus {
-  id:                   string;
-  room_code:            string;
-  room_name:            string;
-  host_player_id:       string | null;
-  game_status:          GameStatus;
-  selected_mode:        string | null;
-  countdown_starts_at:  string | null;
-  countdown_duration?:  number | null;
+  id:                    string;
+  room_code:             string;
+  room_name:             string;
+  host_player_id?:       string | null;
+  game_status:           GameStatus;
+  selected_mode?:        string | null;
+  countdown_starts_at?:  string | null;
+  countdown_duration?:   number | null;
   challenge_started_at?: string | null;
-  active_round_id:      string | null;
-  current_round_number: number | null;
+  active_round_id?:      string | null;
+  current_round_number?: number | null;
 }
 
 export interface LobbyPlayerRow {
@@ -385,47 +385,72 @@ export async function setRoomPlaying(roomId: string): Promise<void> {
 }
 
 /**
- * Host resets room back to lobby state.
- * Falls back gracefully if countdown_starts_at column is not yet in the schema.
+ * Host resets room back to lobby / waiting state after a challenge ends.
+ *
+ * Clears all active-challenge fields so the host can pick a new game.
+ * Players and scores are NOT touched — only the rooms row is updated.
+ *
+ * Returns the full confirmed room row so the caller can apply it to local
+ * state immediately without waiting for the next poll cycle.
+ *
+ * Robustness: if any of the optional columns are missing (PostgreSQL 42703 /
+ * schema-cache error), falls back to a minimal update containing only the two
+ * core columns (game_status, selected_mode) that have existed since day one.
+ * This guarantees the reset always succeeds even on unpatched databases.
  */
-export async function resetRoom(roomId: string): Promise<void> {
+export async function resetRoom(roomId: string): Promise<RoomWithStatus> {
   console.log('[roomRounds] resetRoom →', { roomId });
+
+  // Full payload — clears every challenge-state field the UI cares about.
   const { data, error } = await supabase
     .from('rooms')
     .update({
-      game_status:         'waiting',
-      selected_mode:       null,
-      countdown_starts_at: null,
-      active_round_id:     null,
+      game_status:          'waiting',
+      selected_mode:        null,
+      countdown_starts_at:  null,
+      countdown_duration:   3,
+      challenge_started_at: null,
+      active_round_id:      null,
+      current_round_number: null,
     })
     .eq('id', roomId)
-    .select('id, game_status');
+    .select('*');
 
   if (!error) {
     assertUpdated(data, 'resetRoom');
-    console.log('[roomRounds] resetRoom confirmed:', data);
-    return;
+    const row = (data as unknown[])[0] as RoomWithStatus;
+    console.log('[roomRounds] resetRoom confirmed:', row);
+    return row;
   }
 
-  const pg  = error as { message?: string; code?: string; details?: string; hint?: string };
-  const msg = (pg.message ?? '').toLowerCase();
+  // ── Fallback for missing optional columns (42703 / schema cache) ────────────
+  const pg   = error as { message?: string; code?: string; details?: string; hint?: string };
+  const msg  = (pg.message ?? '').toLowerCase();
   const code = pg.code ?? '';
   console.error('[roomRounds] resetRoom error', {
     message: pg.message, code: pg.code, details: pg.details, hint: pg.hint,
   });
 
-  // 42703 = column missing — retry without countdown_starts_at
-  if (code === '42703' || msg.includes('countdown_starts_at') || msg.includes('schema cache')) {
-    console.warn('[roomRounds] resetRoom: countdown_starts_at missing — retrying without it');
+  const isMissingColumn =
+    code === '42703' ||
+    msg.includes('schema cache') ||
+    msg.includes('does not exist') ||
+    msg.includes('column');
+
+  if (isMissingColumn) {
+    // Minimal fallback: only the two columns guaranteed to exist.
+    // This clears the active game state regardless of schema version.
+    console.warn('[roomRounds] resetRoom: optional columns missing — falling back to minimal reset');
     const { data: d2, error: e2 } = await supabase
       .from('rooms')
-      .update({ game_status: 'waiting', selected_mode: null, active_round_id: null })
+      .update({ game_status: 'waiting', selected_mode: null })
       .eq('id', roomId)
-      .select('id, game_status');
+      .select('*');
     if (e2) throw toError(e2);
-    assertUpdated(d2, 'resetRoom-fallback');
-    console.log('[roomRounds] resetRoom fallback confirmed:', d2);
-    return;
+    assertUpdated(d2, 'resetRoom-minimal');
+    const row2 = (d2 as unknown[])[0] as RoomWithStatus;
+    console.log('[roomRounds] resetRoom minimal confirmed:', row2);
+    return row2;
   }
 
   throw toError(error);

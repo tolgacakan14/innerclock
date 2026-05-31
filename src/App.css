@@ -2070,6 +2070,8 @@ body {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  overscroll-behavior: none;   /* prevent Safari rubber-band from interrupting drag */
+  -webkit-overflow-scrolling: auto;
 }
 
 /* ── Header ─────────────────────────────────────────────────── */
@@ -2119,8 +2121,10 @@ body {
   flex: 1;
   position: relative;
   overflow: hidden;
+  background: #080C09;  /* matches wrap bg — fills blank area during aim zoom-out */
   /* subtle vignette around the field */
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+  will-change: transform;  /* hint to compositor for smooth scale animation */
 }
 
 .golf-game-svg {

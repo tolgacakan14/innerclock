@@ -59,6 +59,52 @@ function resolveBorder(
   return { x, y, vx, vy };
 }
 
+// ── Aim camera params ─────────────────────────────────────────────────────────
+//
+// Called once when the player starts aiming.  Returns the ideal zoom scale and
+// CSS transform-origin (as percentages) for the current ball position.
+//
+// Strategy:
+//  • Base aim scale is 0.78 — noticeably tighter zoom than the old 0.86.
+//  • When the ball is within ~18 % of any course edge, scale drops further to
+//    0.68 so the player has a larger drag region.
+//  • The transform-origin is shifted *away* from the edge the ball is near.
+//    This means the zoomed-out view expands toward the edge, giving the player
+//    the most possible physical drag room in exactly the direction they need it.
+//  • At scale = 1 (after shot release) the origin has zero visual effect, so we
+//    intentionally do NOT reset it on release — changing the origin during the
+//    scale-back animation would cause an ugly drift/jump.
+
+interface AimParams { scale: number; originX: number; originY: number }
+
+function computeAimParams(bx: number, by: number): AimParams {
+  const courseW = COURSE_R - COURSE_L;  // 510
+  const courseH = COURSE_B - COURSE_T;  // 800
+  const margin  = 0.18;                 // 18 % edge zone
+
+  const nearLeft   = bx < COURSE_L + courseW * margin;
+  const nearRight  = bx > COURSE_R - courseW * margin;
+  const nearTop    = by < COURSE_T + courseH * margin;
+  const nearBottom = by > COURSE_B - courseH * margin;
+  const nearEdge   = nearLeft || nearRight || nearTop || nearBottom;
+
+  const scale = nearEdge ? 0.68 : 0.78;
+
+  // Express ball position as 0–100 % of the SVG viewBox dimensions
+  const ballXPct = (bx / VW) * 100;
+  const ballYPct = (by / VH) * 100;
+
+  // Shift the origin in the OPPOSITE direction to the edge the ball is near.
+  // Formula: 50 + (50 − ballPct) × shiftFactor
+  //   ball at 7.5 % (near left)  → +ve shift → origin moves right (gives more room on left)
+  //   ball at 92.5 % (near right) → −ve shift → origin moves left  (gives more room on right)
+  const shift   = nearEdge ? 0.38 : 0.18;
+  const originX = Math.max(20, Math.min(80, 50 + (50 - ballXPct) * shift));
+  const originY = Math.max(20, Math.min(80, 50 + (50 - ballYPct) * shift));
+
+  return { scale, originX, originY };
+}
+
 // ── Aim indicator ─────────────────────────────────────────────────────────────
 
 function AimIndicator({ bx, by, ax, ay }: { bx: number; by: number; ax: number; ay: number }) {
@@ -118,6 +164,10 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   const [phase,      setPhase]      = useState<Phase>('idle');
   const [showKrone,  setShowKrone]  = useState(false);
   const [aimScale,   setAimScale]   = useState(1);
+  // transform-origin percentages — updated on aiming start, intentionally NOT
+  // reset on release (at scale=1 the origin has no visual effect, so keeping it
+  // avoids a camera-drift artifact during the spring-back animation).
+  const [aimOrigin,  setAimOrigin]  = useState({ x: 50, y: 50 });
 
   const aimCurrentRef = useRef<{ x: number; y: number } | null>(null);
   const [aimDisplay,  setAimDisplay] = useState<{ x: number; y: number } | null>(null);
@@ -221,9 +271,15 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     if (Math.hypot(pt.x - b.x, pt.y - b.y) > BALL_TAP_R) return;
     phaseRef.current = 'aiming';
     setPhase('aiming');
-    setAimScale(0.86);
+
+    // Compute edge-aware zoom scale and transform-origin
+    const params = computeAimParams(b.x, b.y);
+    setAimScale(params.scale);
+    setAimOrigin({ x: params.originX, y: params.originY });
+
     aimCurrentRef.current = { x: b.x, y: b.y };
     setAimDisplay({ x: b.x, y: b.y });
+    // Capture pointer so drag continues even when finger leaves the SVG element
     (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
   }
 
@@ -236,6 +292,9 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   }
 
   function handlePointerUp() {
+    // Reset scale only — aimOrigin is intentionally kept unchanged.
+    // Changing the origin simultaneously with the scale-back animation would
+    // make the field appear to drift/slide, which feels broken.
     setAimScale(1);
     if (phaseRef.current !== 'aiming') return;
     const current = aimCurrentRef.current;
@@ -291,9 +350,14 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
       <div
         className="golf-game-field"
         style={{
-          transform: `scale(${aimScale})`,
-          transformOrigin: 'center center',
-          transition: aimScale < 1 ? 'transform 0.12s ease' : 'transform 0.32s ease',
+          transform:       `scale(${aimScale})`,
+          // Dynamic origin: shifts away from the edge the ball is near,
+          // opening up more drag room in that direction.
+          transformOrigin: `${aimOrigin.x}% ${aimOrigin.y}%`,
+          // Snappy zoom-in on drag start; smooth spring-back on release.
+          transition: aimScale < 1
+            ? 'transform 0.16s cubic-bezier(0.25, 0, 0, 1)'
+            : 'transform 0.40s cubic-bezier(0.25, 0, 0, 1)',
         }}
       >
         <svg
