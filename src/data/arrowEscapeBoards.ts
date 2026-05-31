@@ -1,5 +1,5 @@
 /**
- * Arrow Escape — 15 hard puzzle boards.
+ * Arrow Escape — 15 puzzle boards with tiered difficulty.
  *
  * Escape rule: tap arrow at (r,c) pointing dir. It escapes only if
  * NO other arrow exists in its escape lane:
@@ -10,8 +10,11 @@
  *
  * Every board has been manually traced for solvability.
  * Grid is 0-indexed, (0,0) = top-left.
- * Board sizes: 8×8 (most) and 9×9 (final 5). Arrow counts: 20–24.
- * Typically only 1–2 arrows are escapable at the start.
+ *
+ * Difficulty tiers (one board is drawn from each per game):
+ *   medium  — boards 1–5:  8×8 grid, 20 arrows, straightforward chains
+ *   hard    — boards 6–10: 8–9×9 grid, 21–22 arrows, tighter chains
+ *   expert  — boards 11–15: 9×9 grid, 23–24 arrows, deep cascades
  */
 
 export type ArrowDir = 'up' | 'down' | 'left' | 'right';
@@ -29,7 +32,7 @@ export interface ArrowBoard {
   name:       string;
   gridSize:   number;
   arrows:     ArrowItem[];
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
 }
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -56,7 +59,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // which in turn unblocks the left-row chain and vertical chains.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 1, name: 'Iron Gate', gridSize: 8, difficulty: 'hard',
+    id: 1, name: 'Iron Gate', gridSize: 8, difficulty: 'medium',
     arrows: [
       // Row 0 right-sweep: (0,7)→ START → (0,5)→ → (0,3)→ → (0,1)→
       { id:1,  row:0, col:7, dir:'right', color:CY },  // START
@@ -110,7 +113,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // START: (0,7)→ and (7,0)←
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 2, name: 'Crossfire', gridSize: 8, difficulty: 'hard',
+    id: 2, name: 'Crossfire', gridSize: 8, difficulty: 'medium',
     arrows: [
       // TOP row right-sweep (4 arrows)
       { id:1,  row:0, col:7, dir:'right', color:CY },  // START
@@ -156,7 +159,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // chains can proceed. Single START on the center column.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 3, name: 'The Vault', gridSize: 8, difficulty: 'hard',
+    id: 3, name: 'The Vault', gridSize: 8, difficulty: 'medium',
     arrows: [
       // Col 4 up-sweep (7 deep): (0,4)↑ is START, cascades to (6,4)↑
       { id:1,  row:0, col:4, dir:'up',    color:CY },  // START
@@ -195,7 +198,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // Outer spiral of arrows: must clear counter-clockwise from two STARTs.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 4, name: 'Spiral Lock', gridSize: 8, difficulty: 'hard',
+    id: 4, name: 'Spiral Lock', gridSize: 8, difficulty: 'medium',
     arrows: [
       // Top-right corner, right-start
       { id:1,  row:0, col:7, dir:'right', color:CY },   // START
@@ -234,7 +237,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // at least 2 prior removals.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 5, name: 'Deadlock', gridSize: 8, difficulty: 'hard',
+    id: 5, name: 'Deadlock', gridSize: 8, difficulty: 'medium',
     arrows: [
       // SINGLE START: (7,7)↓ — col 7, rows > 7 = nothing.
       { id:1,  row:7, col:7, dir:'down',  color:CY },   // START
@@ -494,7 +497,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 11  "Cascade"  8×8  22 arrows — long single chain with branches
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 11, name: 'Cascade', gridSize: 8, difficulty: 'hard',
+    id: 11, name: 'Cascade', gridSize: 8, difficulty: 'expert',
     arrows: [
       // Phase 1: clear col 7 top-down
       { id:1,  row:0, col:7, dir:'down',  color:CY },  // START (col7 rows>0: id2 below)
@@ -537,7 +540,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 12  "Maze Runner"  9×9  24 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 12, name: 'Maze Runner', gridSize: 9, difficulty: 'hard',
+    id: 12, name: 'Maze Runner', gridSize: 9, difficulty: 'expert',
     arrows: [
       // START: corners (0,8)→ and (8,0)←
       { id:1,  row:0, col:8, dir:'right', color:CY },  // START
@@ -575,7 +578,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 13  "Vortex"  9×9  23 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 13, name: 'Vortex', gridSize: 9, difficulty: 'hard',
+    id: 13, name: 'Vortex', gridSize: 9, difficulty: 'expert',
     arrows: [
       // Col 4 full sweep (9 arrows, 0 to 8 up):
       // (0,4)↑ is instant (col4 rows<0 = nothing).
@@ -612,7 +615,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 14  "End Game"  9×9  24 arrows — maximum density
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 14, name: 'End Game', gridSize: 9, difficulty: 'hard',
+    id: 14, name: 'End Game', gridSize: 9, difficulty: 'expert',
     arrows: [
       // Two STARTs: top-right and bottom-left
       { id:1,  row:0, col:8, dir:'right', color:CY },
@@ -651,7 +654,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 15  "Final Boss"  9×9  24 arrows — hardest
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 15, name: 'Final Boss', gridSize: 9, difficulty: 'hard',
+    id: 15, name: 'Final Boss', gridSize: 9, difficulty: 'expert',
     arrows: [
       // ONLY ONE instant start: (8,8)↓
       { id:1,  row:8, col:8, dir:'down',  color:CY },  // START

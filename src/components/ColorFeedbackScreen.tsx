@@ -23,7 +23,7 @@ function getFeedbackMsg(score: number): string {
 export default function ColorFeedbackScreen({
   target, selected, roundIndex, totalRounds, onNext, onHome,
 }: Props) {
-  const { deltaE, score } = calcColorScore(target, selected);
+  const { score } = calcColorScore(target, selected);
   const message = getFeedbackMsg(score);
 
   return (
@@ -57,14 +57,6 @@ export default function ColorFeedbackScreen({
             style={{ background: `hsl(${selected.h}, ${selected.s}%, ${selected.l}%)` }}
           />
           <span className="swatch-label">Your color</span>
-        </div>
-      </div>
-
-      {/* Delta E detail card */}
-      <div className="feedback-rows">
-        <div className="feedback-row">
-          <span>Delta E</span>
-          <span>{deltaE.toFixed(1)}</span>
         </div>
       </div>
 

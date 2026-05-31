@@ -5379,13 +5379,17 @@ body {
 .mg-grid {
   display: grid;
   grid-template-columns: repeat(var(--mg-cols, 3), 1fr);
-  gap: 9px;
-  padding: 12px 22px;
+  /* Tighter gap on small screens / many columns so the grid fits without overflow */
+  gap: clamp(4px, 1.6vw, 9px);
+  padding: 10px 18px;
   flex: 1;
+  /* min-height: 0 prevents the flex child from growing past the container */
+  min-height: 0;
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   box-sizing: border-box;
   align-content: center;
+  overflow: hidden;
 }
 
 .mg-cell {
@@ -5448,6 +5452,30 @@ body {
   font-size: 13px;
   color: rgba(255,255,255,0.28);
   letter-spacing: 0.1px;
+}
+
+/* Memory Grid results — prominent level-reached badge */
+.mg-result-level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 8px;
+}
+.mg-result-level-num {
+  font-size: 72px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -2px;
+  color: #5AC8F5;
+  text-shadow: 0 0 32px rgba(90,200,245,0.55), 0 0 8px rgba(90,200,245,0.30);
+}
+.mg-result-level-sub {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: rgba(90,200,245,0.60);
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -14,13 +14,23 @@ interface Props {
   roomContext?: import('../types').RoomContext;
 }
 
+/**
+ * Pick exactly 3 boards — one from each difficulty tier — always in escalating
+ * order: medium → hard → expert.
+ * Within each tier, one board is chosen at random so every game feels fresh.
+ */
 function pickBoards() {
-  const picked = [...arrowEscapeBoards].sort(() => Math.random() - 0.5).slice(0, 3);
+  function rand<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+  const medium = arrowEscapeBoards.filter(b => b.difficulty === 'medium');
+  const hard   = arrowEscapeBoards.filter(b => b.difficulty === 'hard');
+  const expert = arrowEscapeBoards.filter(b => b.difficulty === 'expert');
+  const picked = [rand(medium), rand(hard), rand(expert)];
+
   if (import.meta.env.DEV) {
     const ids   = picked.map(b => b.id);
     const names = picked.map(b => b.name);
-    const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
-    if (dupes.length > 0) console.warn('⚠️  Arrow Escape: duplicate boards!', dupes);
     console.group('%c🏹 Arrow Escape — boards selected', 'font-weight:bold;color:#a8d0ff');
     names.forEach((n, i) => console.log(`  Round ${i + 1}: #${ids[i]} "${n}" [${picked[i].difficulty}]`));
     console.groupEnd();

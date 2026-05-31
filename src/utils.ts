@@ -285,31 +285,32 @@ export function deltaE2000(
 /**
  * Map CIEDE2000 Delta E to a perceptual score 0–100.
  *
- * Standardised piecewise curve — strict but fair.
+ * Softer piecewise curve — generous in the mid-range so casual players
+ * still get rewarding scores on colours that are clearly "in the ballpark".
  *
  *  ΔE range     | Score range  | Perceptual meaning
  *  -------------+--------------+-----------------------------------
  *   0.0 –  1.0  | 100 → 97     | Imperceptible / identical
- *   1.0 –  2.0  |  97 → 92     | Excellent match
- *   2.0 –  5.0  |  92 → 80     | Very good — close family
- *   5.0 – 10.0  |  80 → 62     | Visible but acceptable
- *  10.0 – 20.0  |  62 → 38     | Noticeable — same hue family
- *  20.0 – 35.0  |  38 → 15     | Poor — different shade
- *  35.0 – 50.0  |  15 →  3     | Very poor — unrelated
- *  50.0 – 65.0  |   3 →  0     | Completely different
+ *   1.0 –  2.0  |  97 → 93     | Excellent match
+ *   2.0 –  5.0  |  93 → 82     | Very good — close family
+ *   5.0 – 10.0  |  82 → 72     | Visible but rewarding (≥70 at ΔE=10)
+ *  10.0 – 20.0  |  72 → 48     | Noticeable — same hue family (≥45 at ΔE=20)
+ *  20.0 – 35.0  |  48 → 20     | Poor — different shade
+ *  35.0 – 50.0  |  20 →  5     | Very poor — unrelated
+ *  50.0 – 65.0  |   5 →  0     | Completely different
  *  65.0+         |   0          | Maximum mismatch
  */
 function scoreFromDeltaE(de: number): number {
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
   let raw: number;
   if      (de <=  1) raw = lerp(100, 97, de /  1.0);
-  else if (de <=  2) raw = lerp( 97, 92, (de -  1) /  1.0);
-  else if (de <=  5) raw = lerp( 92, 80, (de -  2) /  3.0);
-  else if (de <= 10) raw = lerp( 80, 62, (de -  5) /  5.0);
-  else if (de <= 20) raw = lerp( 62, 38, (de - 10) / 10.0);
-  else if (de <= 35) raw = lerp( 38, 15, (de - 20) / 15.0);
-  else if (de <= 50) raw = lerp( 15,  3, (de - 35) / 15.0);
-  else if (de <= 65) raw = lerp(  3,  0, (de - 50) / 15.0);
+  else if (de <=  2) raw = lerp( 97, 93, (de -  1) /  1.0);
+  else if (de <=  5) raw = lerp( 93, 82, (de -  2) /  3.0);
+  else if (de <= 10) raw = lerp( 82, 72, (de -  5) /  5.0);
+  else if (de <= 20) raw = lerp( 72, 48, (de - 10) / 10.0);
+  else if (de <= 35) raw = lerp( 48, 20, (de - 20) / 15.0);
+  else if (de <= 50) raw = lerp( 20,  5, (de - 35) / 15.0);
+  else if (de <= 65) raw = lerp(  5,  0, (de - 50) / 15.0);
   else               raw = 0;
   return Math.max(0, Math.min(100, Math.round(raw)));
 }

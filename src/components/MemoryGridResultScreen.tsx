@@ -30,6 +30,12 @@ export default function MemoryGridResultScreen({
         {playerName ? `${playerName}'s Score` : 'Your Score'}
       </p>
 
+      {/* Level-reached badge — the primary achievement metric */}
+      <div className="mg-result-level-badge">
+        <span className="mg-result-level-num">{completedRounds + 1}</span>
+        <span className="mg-result-level-sub">level reached</span>
+      </div>
+
       <div className="final-score">
         <span className="score-number">{score}</span>
         <span className="score-denom">pts</span>

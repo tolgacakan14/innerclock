@@ -86,9 +86,13 @@ function computeAimParams(bx: number, by: number): AimParams {
   const nearRight  = bx > COURSE_R - courseW * margin;
   const nearTop    = by < COURSE_T + courseH * margin;
   const nearBottom = by > COURSE_B - courseH * margin;
-  const nearEdge   = nearLeft || nearRight || nearTop || nearBottom;
+  const edgeCount  = (nearLeft ? 1 : 0) + (nearRight ? 1 : 0) +
+                     (nearTop  ? 1 : 0) + (nearBottom ? 1 : 0);
+  const nearCorner = edgeCount >= 2;   // two simultaneous edges = corner
+  const nearEdge   = edgeCount >= 1;
 
-  const scale = nearEdge ? 0.68 : 0.78;
+  // Corner: extra zoom-out so the player still has a usable drag region
+  const scale = nearCorner ? 0.52 : nearEdge ? 0.68 : 0.78;
 
   // Express ball position as 0–100 % of the SVG viewBox dimensions
   const ballXPct = (bx / VW) * 100;
@@ -107,12 +111,26 @@ function computeAimParams(bx: number, by: number): AimParams {
 
 // ── Aim indicator ─────────────────────────────────────────────────────────────
 
-function AimIndicator({ bx, by, ax, ay }: { bx: number; by: number; ax: number; ay: number }) {
-  const dx = ax - bx, dy = ay - by;
+// bx/by  — ball centre (ring anchor + arrow start)
+// anchorX/Y — where the player first touched
+// currentX/Y — current pointer position
+// Direction = anchorX/Y → currentX/Y ; shot fires in the OPPOSITE direction.
+// Deadzone uses the anchor→current distance, not ball→pointer, so the first
+// touch never produces an instant wrong-direction aim.
+function AimIndicator({
+  bx, by,
+  anchorX, anchorY,
+  currentX, currentY,
+}: {
+  bx: number; by: number;
+  anchorX: number; anchorY: number;
+  currentX: number; currentY: number;
+}) {
+  const dx = currentX - anchorX, dy = currentY - anchorY;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 4) return null;
+  if (dist < 10) return null;                    // 10 SVG-unit deadzone
   const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
-  const nx = -dx / dist, ny = -dy / dist;
+  const nx = -dx / dist, ny = -dy / dist;        // opposite of drag direction
   const len = power * 170;
   return (
     <>
@@ -169,7 +187,12 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   // avoids a camera-drift artifact during the spring-back animation).
   const [aimOrigin,  setAimOrigin]  = useState({ x: 50, y: 50 });
 
+  // aimAnchorRef — where the player's finger first landed (stays fixed for the whole drag).
+  // aimCurrentRef — follows the finger during the drag.
+  // Shot direction = (anchor → current) reversed; deadzone = dist(anchor, current).
+  const aimAnchorRef  = useRef<{ x: number; y: number } | null>(null);
   const aimCurrentRef = useRef<{ x: number; y: number } | null>(null);
+  const [aimAnchor,   setAimAnchor]  = useState<{ x: number; y: number } | null>(null);
   const [aimDisplay,  setAimDisplay] = useState<{ x: number; y: number } | null>(null);
 
   // ── Physics loop ──────────────────────────────────────────────────────────
@@ -277,8 +300,13 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     setAimScale(params.scale);
     setAimOrigin({ x: params.originX, y: params.originY });
 
-    aimCurrentRef.current = { x: b.x, y: b.y };
-    setAimDisplay({ x: b.x, y: b.y });
+    // Anchor = where the player touched (NOT the ball centre).
+    // The shot direction will be derived from anchor→current, so a touch at the
+    // edge of the tap zone no longer creates an instant wrong-direction aim.
+    aimAnchorRef.current  = { x: pt.x, y: pt.y };
+    aimCurrentRef.current = { x: pt.x, y: pt.y };
+    setAimAnchor({ x: pt.x, y: pt.y });
+    setAimDisplay({ x: pt.x, y: pt.y });
     // Capture pointer so drag continues even when finger leaves the SVG element
     (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
   }
@@ -297,20 +325,29 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     // make the field appear to drift/slide, which feels broken.
     setAimScale(1);
     if (phaseRef.current !== 'aiming') return;
-    const current = aimCurrentRef.current;
-    const b = ballRef.current;
-    if (!current) { phaseRef.current = 'idle'; setPhase('idle'); return; }
 
-    const dx = current.x - b.x, dy = current.y - b.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const anchor  = aimAnchorRef.current;
+    const current = aimCurrentRef.current;
+    const b       = ballRef.current;
+
+    // Clear refs & display states before any early-return
+    aimAnchorRef.current  = null;
     aimCurrentRef.current = null;
+    setAimAnchor(null);
     setAimDisplay(null);
 
-    if (dist < 6) { phaseRef.current = 'idle'; setPhase('idle'); return; }
+    if (!anchor || !current) { phaseRef.current = 'idle'; setPhase('idle'); return; }
+
+    // Displacement from anchor → current gives the drag vector.
+    // Shot fires in the OPPOSITE direction (same concept as pulling a slingshot).
+    const dx = current.x - anchor.x, dy = current.y - anchor.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // 10 SVG-unit deadzone — matches the AimIndicator visibility threshold.
+    if (dist < 10) { phaseRef.current = 'idle'; setPhase('idle'); return; }
 
     const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
     const speed = power * MAX_SPEED;
-    // Reset prev position before new shot
     prevBallPosRef.current = { x: b.x, y: b.y };
     ballRef.current = { ...b, vx: (-dx / dist) * speed, vy: (-dy / dist) * speed };
 
@@ -461,9 +498,13 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
               stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="5 4" />
           )}
 
-          {/* Aim indicator */}
-          {phase === 'aiming' && aimDisplay && (
-            <AimIndicator bx={ballPos.x} by={ballPos.y} ax={aimDisplay.x} ay={aimDisplay.y} />
+          {/* Aim indicator — direction is anchor→current, arrow drawn from ball */}
+          {phase === 'aiming' && aimAnchor && aimDisplay && (
+            <AimIndicator
+              bx={ballPos.x}      by={ballPos.y}
+              anchorX={aimAnchor.x}  anchorY={aimAnchor.y}
+              currentX={aimDisplay.x} currentY={aimDisplay.y}
+            />
           )}
 
           {/* Ball shadow — not rotating */}

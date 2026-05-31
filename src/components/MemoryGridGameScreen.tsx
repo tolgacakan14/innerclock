@@ -4,14 +4,67 @@ import { useState, useRef, useEffect } from 'react';
 
 interface RoundConfig { gridSize: number; cells: number; previewMs: number; }
 
+// 45 round configs covering 5 escalating phases.
+// After round 45 the last config repeats (see getConfig).
+//
+//  Phase 1 — Rounds  1– 3: 3×3 intro       (3 entries)
+//  Phase 2 — Rounds  4– 7: 4×4 warm-up     (4 entries)
+//  Phase 3 — Rounds  8–17: 5×5 intermediate (10 entries)
+//  Phase 4 — Rounds 18–28: 6×6 advanced    (11 entries)
+//  Phase 5 — Rounds 29–38: 7×7 hard        (10 entries)
+//  Phase 6 — Rounds 39–45: 8×8 expert      ( 7 entries)
 const ROUND_CONFIGS: RoundConfig[] = [
-  { gridSize: 3, cells: 3, previewMs: 1500 },  // round 1
-  { gridSize: 3, cells: 4, previewMs: 1300 },  // round 2
-  { gridSize: 3, cells: 5, previewMs: 1200 },  // round 3
-  { gridSize: 4, cells: 5, previewMs: 1100 },  // round 4
-  { gridSize: 4, cells: 6, previewMs: 1000 },  // round 5
-  { gridSize: 4, cells: 7, previewMs:  900 },  // round 6
-  { gridSize: 5, cells: 8, previewMs:  800 },  // round 7+
+  // ── Phase 1: 3×3 ─────────────────────────────────────────────────────────
+  { gridSize: 3, cells: 3, previewMs: 1500 },  // 1
+  { gridSize: 3, cells: 4, previewMs: 1300 },  // 2
+  { gridSize: 3, cells: 5, previewMs: 1200 },  // 3
+  // ── Phase 2: 4×4 ─────────────────────────────────────────────────────────
+  { gridSize: 4, cells: 5, previewMs: 1100 },  // 4
+  { gridSize: 4, cells: 6, previewMs: 1000 },  // 5
+  { gridSize: 4, cells: 7, previewMs:  900 },  // 6
+  { gridSize: 4, cells: 8, previewMs:  850 },  // 7
+  // ── Phase 3: 5×5 ─────────────────────────────────────────────────────────
+  { gridSize: 5, cells:  8, previewMs: 800 },  // 8
+  { gridSize: 5, cells:  9, previewMs: 780 },  // 9
+  { gridSize: 5, cells: 10, previewMs: 750 },  // 10
+  { gridSize: 5, cells: 11, previewMs: 720 },  // 11
+  { gridSize: 5, cells: 12, previewMs: 700 },  // 12
+  { gridSize: 5, cells: 13, previewMs: 680 },  // 13
+  { gridSize: 5, cells: 14, previewMs: 650 },  // 14
+  { gridSize: 5, cells: 15, previewMs: 630 },  // 15
+  { gridSize: 5, cells: 16, previewMs: 610 },  // 16
+  { gridSize: 5, cells: 17, previewMs: 590 },  // 17
+  // ── Phase 4: 6×6 ─────────────────────────────────────────────────────────
+  { gridSize: 6, cells: 12, previewMs: 700 },  // 18
+  { gridSize: 6, cells: 13, previewMs: 680 },  // 19
+  { gridSize: 6, cells: 14, previewMs: 660 },  // 20
+  { gridSize: 6, cells: 15, previewMs: 640 },  // 21
+  { gridSize: 6, cells: 16, previewMs: 620 },  // 22
+  { gridSize: 6, cells: 17, previewMs: 600 },  // 23
+  { gridSize: 6, cells: 18, previewMs: 580 },  // 24
+  { gridSize: 6, cells: 19, previewMs: 560 },  // 25
+  { gridSize: 6, cells: 20, previewMs: 540 },  // 26
+  { gridSize: 6, cells: 21, previewMs: 520 },  // 27
+  { gridSize: 6, cells: 22, previewMs: 500 },  // 28
+  // ── Phase 5: 7×7 ─────────────────────────────────────────────────────────
+  { gridSize: 7, cells: 16, previewMs: 580 },  // 29
+  { gridSize: 7, cells: 17, previewMs: 560 },  // 30
+  { gridSize: 7, cells: 18, previewMs: 540 },  // 31
+  { gridSize: 7, cells: 19, previewMs: 520 },  // 32
+  { gridSize: 7, cells: 20, previewMs: 500 },  // 33
+  { gridSize: 7, cells: 22, previewMs: 480 },  // 34
+  { gridSize: 7, cells: 24, previewMs: 460 },  // 35
+  { gridSize: 7, cells: 26, previewMs: 440 },  // 36
+  { gridSize: 7, cells: 28, previewMs: 420 },  // 37
+  { gridSize: 7, cells: 30, previewMs: 400 },  // 38
+  // ── Phase 6: 8×8 ─────────────────────────────────────────────────────────
+  { gridSize: 8, cells: 20, previewMs: 480 },  // 39
+  { gridSize: 8, cells: 22, previewMs: 460 },  // 40
+  { gridSize: 8, cells: 24, previewMs: 440 },  // 41
+  { gridSize: 8, cells: 26, previewMs: 420 },  // 42
+  { gridSize: 8, cells: 28, previewMs: 400 },  // 43
+  { gridSize: 8, cells: 30, previewMs: 380 },  // 44
+  { gridSize: 8, cells: 32, previewMs: 360 },  // 45+
 ];
 
 function getConfig(round: number): RoundConfig {

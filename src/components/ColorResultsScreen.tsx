@@ -71,10 +71,6 @@ export default function ColorResultsScreen({ rounds, playerName, onPlayAgain, on
                   aria-label={`Your color`}
                 />
               </div>
-              <div className="results-data-pair">
-                <span className="results-data-label">ΔE</span>
-                <span className="results-data-val">{r.deltaE.toFixed(1)}</span>
-              </div>
             </div>
             <span className="results-list-score">{r.score}</span>
           </div>

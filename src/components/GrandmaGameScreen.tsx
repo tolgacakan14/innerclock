@@ -1203,6 +1203,10 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     // Anti-repeat obstacle tracking
     lastObstType:  'low' as 'low' | 'high' | 'gap',
     sameCount:     0,
+    // Per-cycle shuffled copy of the pattern sequence.
+    // Re-shuffled with Fisher-Yates at the start of each new cycle so the
+    // obstacle order never loops identically — prevents memorisation.
+    shuffledSeq:   [...pattern.sequence] as ('low' | 'high' | 'gap')[],
   });
 
   const jumpPressRef  = useRef(false);
@@ -1457,7 +1461,18 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         || gs.obstacles[gs.obstacles.length - 1].x < CW - gs.nextObstX;
 
       if (needsSpawn) {
-        let rawType = pattern.sequence[gs.patternIdx % pattern.sequence.length] as 'low' | 'high' | 'gap';
+        // At the start of each new cycle (after the first), reshuffle the
+        // sequence so subsequent loops play out in a fresh order.
+        const seqLen = gs.shuffledSeq.length;
+        if (gs.patternIdx > 0 && gs.patternIdx % seqLen === 0) {
+          const seq = [...gs.shuffledSeq];
+          for (let i = seq.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [seq[i], seq[j]] = [seq[j], seq[i]];
+          }
+          gs.shuffledSeq = seq;
+        }
+        let rawType = gs.shuffledSeq[gs.patternIdx % seqLen] as 'low' | 'high' | 'gap';
 
         // Anti-repeat: prevent more than 2 consecutive same-type obstacles
         if (rawType === gs.lastObstType) {
