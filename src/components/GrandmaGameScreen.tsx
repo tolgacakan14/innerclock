@@ -1165,6 +1165,10 @@ interface Props {
 }
 
 export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onHome }: Props) {
+  // ── Hot Mode config (derived from pattern, stable for this component lifetime) ─
+  const isHot       = !!pattern.isHot;
+  const hotSpeedMult = pattern.speedMultiplier ?? 1;
+
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -1182,7 +1186,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     patternIdx:   0,
     elapsed:      0,
     scrollDist:   0,
-    speed:        BASE_SPEED,
+    speed:        BASE_SPEED * hotSpeedMult,
     alive:        false,
     dying:        false,
     deathTimer:   0,
@@ -1190,6 +1194,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     chaserLegPhase: 0,
     obsIdCounter: 0,
     currentLevel: 0,
+    // Hot Mode: pre-set speed so we're already at 2× on frame 1
     // Chaser sync ring buffer
     histIdx:       0,
     chaserHistY:      Array.from({ length: HIST }, () => GROUND_Y) as number[],
@@ -1256,24 +1261,33 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       const score = Math.floor(elapsed);
       ctx.save();
       ctx.font         = 'bold 22px -apple-system, Helvetica Neue, sans-serif';
-      ctx.fillStyle    = 'rgba(255,255,255,0.92)';
+      ctx.fillStyle    = isHot ? 'rgba(255,130,80,0.98)' : 'rgba(255,255,255,0.92)';
       ctx.textAlign    = 'right';
       ctx.textBaseline = 'top';
       ctx.fillText(`${score}`, CW - 22, 20);
       ctx.font      = '12px -apple-system, Helvetica Neue, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.38)';
+      ctx.fillStyle = isHot ? 'rgba(255,100,50,0.55)' : 'rgba(255,255,255,0.38)';
       ctx.fillText('pts', CW - 22, 46);
       // Speed level indicator (small)
       ctx.font      = '11px -apple-system, Helvetica Neue, sans-serif';
-      ctx.fillStyle = level >= 6
-        ? 'rgba(220,30,255,0.95)'   // Virgin Mode — neon purple
-        : level >= 5
-        ? 'rgba(255,60,0,0.95)'     // Last Dance — red-orange
-        : level >= 4
-        ? 'rgba(255,180,50,0.80)'   // Menopause — amber
-        : 'rgba(255,255,255,0.32)';
-      ctx.textAlign = 'left';
-      ctx.fillText(SPEED_LEVELS[level].name, 22, 20);
+      if (isHot) {
+        // HOT MODE badge — centred, pulsing orange
+        const pulse = 0.85 + Math.sin(elapsed * 6) * 0.15;
+        ctx.fillStyle   = `rgba(255,${Math.floor(50 + pulse * 30)},8,${0.88 + pulse * 0.12})`;
+        ctx.textAlign   = 'center';
+        ctx.font        = 'bold 11px -apple-system, Helvetica Neue, sans-serif';
+        ctx.fillText('HOT MODE', CW / 2, 20);
+      } else {
+        ctx.fillStyle = level >= 6
+          ? 'rgba(220,30,255,0.95)'   // Virgin Mode — neon purple
+          : level >= 5
+          ? 'rgba(255,60,0,0.95)'     // Last Dance — red-orange
+          : level >= 4
+          ? 'rgba(255,180,50,0.80)'   // Menopause — amber
+          : 'rgba(255,255,255,0.32)';
+        ctx.textAlign = 'left';
+        ctx.fillText(SPEED_LEVELS[level].name, 22, 20);
+      }
       ctx.restore();
     }
 
@@ -1287,6 +1301,21 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       drawBackground(ctx, gs.scrollDist, gs.currentLevel);
       drawGround(ctx, gs.scrollDist);
       drawGaps(ctx, gs.obstacles);
+
+      // ── Hot Mode: red canvas overlay + heat gradient ──────────────────────
+      if (isHot) {
+        ctx.save();
+        // Full-canvas crimson tint
+        ctx.fillStyle = 'rgba(140,6,6,0.16)';
+        ctx.fillRect(0, 0, CW, CH);
+        // Animated heat haze from bottom edge
+        const heatGrad = ctx.createLinearGradient(0, CH, 0, CH - 85);
+        heatGrad.addColorStop(0, `rgba(255,50,8,${0.26 + Math.sin(gs.elapsed * 3) * 0.06})`);
+        heatGrad.addColorStop(1, 'rgba(255,0,0,0)');
+        ctx.fillStyle = heatGrad;
+        ctx.fillRect(0, CH - 85, CW, 85);
+        ctx.restore();
+      }
 
       // ── Death animation ───────────────────────────────────────────────────
       if (gs.dying) {
@@ -1360,7 +1389,8 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       }
 
       // Smooth speed lerp toward the target multiplier for current level
-      const targetSpd = BASE_SPEED * SPEED_LEVELS[gs.currentLevel].multiplier;
+      // Hot Mode: hotSpeedMult doubles the effective BASE_SPEED throughout
+      const targetSpd = BASE_SPEED * hotSpeedMult * SPEED_LEVELS[gs.currentLevel].multiplier;
       gs.speed       += (targetSpd - gs.speed) * LERP_F * dt;
       gs.scrollDist  += gs.speed * dt;
 
@@ -1470,18 +1500,21 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       for (const obs of gs.obstacles) drawObstacle(ctx, obs.x, obs.type);
 
       // Last Dance + Virgin Mode — grandma foot flames (drawn before grandma body)
-      if (gs.currentLevel >= 5 && gs.onGround) {
+      // Hot Mode: flames appear from the very start
+      if ((gs.currentLevel >= 5 || isHot) && gs.onGround) {
         drawGrandmaFootFlames(ctx, CHAR_X, gs.charY, gs.legPhase);
       }
 
       // Chaser — creeps closer at higher levels, mirrors grandma with delay
+      // Hot Mode: force draw level >= 4 so flames appear from frame 1
+      const chaserDrawLevel = isHot ? Math.max(4, gs.currentLevel) : gs.currentLevel;
       const chaserX = (CHAR_X - 90) + gs.currentLevel * 8;
       if (chaserCrouch) {
-        drawChaser(ctx, chaserX, GROUND_Y, gs.chaserLegPhase, gs.currentLevel, true);
+        drawChaser(ctx, chaserX, GROUND_Y, gs.chaserLegPhase, chaserDrawLevel, true);
       } else if (chaserAirborne) {
-        drawChaser(ctx, chaserX, chaserFeetY, gs.chaserLegPhase, gs.currentLevel, false);
+        drawChaser(ctx, chaserX, chaserFeetY, gs.chaserLegPhase, chaserDrawLevel, false);
       } else {
-        drawChaser(ctx, chaserX, GROUND_Y, gs.chaserLegPhase, gs.currentLevel, false);
+        drawChaser(ctx, chaserX, GROUND_Y, gs.chaserLegPhase, chaserDrawLevel, false);
       }
 
       // Grandma
@@ -1572,7 +1605,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
-      className="grandma-game-wrap"
+      className={`grandma-game-wrap${isHot ? ' grandma-game-wrap--hot' : ''}`}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
@@ -1592,7 +1625,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
 
       {/* Canvas + overlays */}
       <div
-        className={`grandma-game-field${virginMode ? ' grandma-game-field--virgin' : ''}${isPortrait ? ' grandma-game-field--portrait' : ''}`}
+        className={`grandma-game-field${virginMode ? ' grandma-game-field--virgin' : ''}${isHot ? ' grandma-game-field--hot' : ''}${isPortrait ? ' grandma-game-field--portrait' : ''}`}
         style={isPortrait ? {
           position:        'absolute' as const,
           top:             '50%',
@@ -1603,6 +1636,12 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
           transformOrigin: 'center center',
         } : { position: 'relative' as const }}
       >
+        {isHot && (
+          <div className="grandma-hot-badge" aria-hidden="true">
+            🔥 HOT MODE
+          </div>
+        )}
+
         <canvas
           ref={canvasRef}
           className="grandma-game-canvas"

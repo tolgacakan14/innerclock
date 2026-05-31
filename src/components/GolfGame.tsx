@@ -94,7 +94,7 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
           course={selected[currentRound]}
           courseIndex={currentRound}
           onComplete={handleRoundComplete}
-          onHome={onExit}
+          onHome={handleExit}
         />
       )}
 
@@ -113,7 +113,7 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
           rounds={roundResults}
           playerName={playerName}
           onPlayAgain={handlePlayAgain}
-          onExit={onExit}
+          onExit={handleExit}
           roomContext={roomContext}
         />
       )}

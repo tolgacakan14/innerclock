@@ -9,6 +9,10 @@ export interface GrandmaPattern {
   baseGap:  number;
   /** +/- randomness added to each gap */
   variance: number;
+  /** Hot Mode flag — triggers extreme visual + speed effects */
+  isHot?:          boolean;
+  /** Multiplied on top of BASE_SPEED × level multiplier */
+  speedMultiplier?: number;
 }
 
 /**
@@ -96,4 +100,10 @@ export const grandmaPatterns: GrandmaPattern[] = [
   { id: 15, name: 'Gauntlet',
     sequence: ['low', 'high', 'gap', 'high', 'low', 'gap', 'low'],
     baseGap: 390, variance: 55 },
+
+  // ── 16. Hot Mode — extreme 2× speed challenge ────────────────────────────
+  { id: 16, name: 'Hot Mode',
+    sequence: ['low', 'high', 'gap', 'low', 'high', 'gap', 'low', 'high'],
+    baseGap: 252, variance: 22,
+    isHot: true, speedMultiplier: 2 },
 ];

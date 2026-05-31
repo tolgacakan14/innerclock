@@ -55,9 +55,12 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
   const [phase,         setPhase]         = useState<Phase>('idle');
   const [level,         setLevel]         = useState(1);
   const [sequence,      setSequence]      = useState<number[]>([]);
-  const [activeIdx,     setActiveIdx]     = useState(-1);   // currently lit tile
+  const [activeIdx,     setActiveIdx]     = useState(-1);   // currently lit tile (demo)
+  const [pressedTile,   setPressedTile]   = useState(-1);   // briefly lit on player tap
   const [inputProgress, setInputProgress] = useState<number[]>([]);
   const [wrongTileIdx,  setWrongTileIdx]  = useState(-1);
+
+  const pressedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const completedRef  = useRef(0);
   const maxSeqLenRef  = useRef(0);
@@ -106,13 +109,22 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
   // Start game on mount
   useEffect(() => {
     const t = setTimeout(() => startLevel(1), 500);
-    return () => { clearTimeout(t); clearTimers(); };
+    return () => {
+      clearTimeout(t);
+      clearTimers();
+      if (pressedTimerRef.current) clearTimeout(pressedTimerRef.current);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Tap handler ───────────────────────────────────────────────────────────
 
   function handleTileTap(tileIndex: number) {
     if (phase !== 'input' || doneRef.current) return;
+
+    // ── Instant visual feedback: light up the tapped tile ─────────────────────
+    if (pressedTimerRef.current) clearTimeout(pressedTimerRef.current);
+    setPressedTile(tileIndex);
+    pressedTimerRef.current = setTimeout(() => setPressedTile(-1), 160);
 
     const expected = sequence[inputProgress.length];
 
@@ -194,15 +206,17 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
       {/* Tile grid — 3 × 2 */}
       <div className="seq-tiles-grid">
         {TILE_COLORS.map((color, i) => {
-          const isActive = activeIdx === i;
-          const isWrong  = wrongTileIdx === i && phase === 'wrong';
+          const isActive  = activeIdx === i;
+          const isPressed = pressedTile === i && phase === 'input' && !isActive;
+          const isWrong   = wrongTileIdx === i && phase === 'wrong';
           return (
             <button
               key={i}
               className={[
                 'seq-tile',
-                isActive ? 'seq-tile--active' : '',
-                isWrong  ? 'seq-tile--wrong'  : '',
+                isActive  ? 'seq-tile--active'  : '',
+                isPressed ? 'seq-tile--pressed'  : '',
+                isWrong   ? 'seq-tile--wrong'    : '',
               ].filter(Boolean).join(' ')}
               style={{ '--seq-color': color } as React.CSSProperties}
               onPointerDown={() => handleTileTap(i)}

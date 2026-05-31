@@ -16,8 +16,13 @@ interface Props {
   roomContext?: import('../types').RoomContext;
 }
 
+/** The single Hot Mode pattern (id 16) */
+const HOT_PATTERN = grandmaPatterns.find(p => p.isHot)!;
+
 function pickRandom(arr: GrandmaPattern[], n: number): GrandmaPattern[] {
-  const picked = [...arr].sort(() => Math.random() - 0.5).slice(0, n);
+  // Exclude Hot Mode from the normal random pool
+  const pool   = arr.filter(p => !p.isHot);
+  const picked = pool.sort(() => Math.random() - 0.5).slice(0, n);
   if (import.meta.env.DEV) {
     const ids   = picked.map(p => p.id);
     const names = picked.map(p => p.name);
@@ -50,6 +55,16 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
     setScreen('playing');
   }
 
+  function handleHotMode() {
+    setTrack('grandma');
+    // All 3 rounds use the Hot Mode pattern
+    setSelected([HOT_PATTERN, HOT_PATTERN, HOT_PATTERN]);
+    setCurrentRound(0);
+    setRoundResults([]);
+    setPlayCount(c => c + 1);
+    setScreen('playing');
+  }
+
   function handleExit() {
     setTrack('main');
     onExit();
@@ -75,7 +90,9 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
   }
 
   function handlePlayAgain() {
-    setSelected(pickRandom(grandmaPatterns, 3));
+    // If all 3 selected rounds were Hot Mode, keep Hot Mode on replay
+    const wasHot = selected.every(p => p.isHot);
+    setSelected(wasHot ? [HOT_PATTERN, HOT_PATTERN, HOT_PATTERN] : pickRandom(grandmaPatterns, 3));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);
@@ -85,7 +102,7 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
   return (
     <>
       {screen === 'intro' && (
-        <GrandmaIntroScreen onStart={handleStart} onBack={handleExit} />
+        <GrandmaIntroScreen onStart={handleStart} onBack={handleExit} onHotMode={handleHotMode} />
       )}
 
       {screen === 'playing' && (

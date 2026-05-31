@@ -1,9 +1,10 @@
 interface Props {
-  onStart: () => void;
-  onBack:  () => void;
+  onStart:    () => void;
+  onBack:     () => void;
+  onHotMode?: () => void;
 }
 
-export default function GrandmaIntroScreen({ onStart, onBack }: Props) {
+export default function GrandmaIntroScreen({ onStart, onBack, onHotMode }: Props) {
   return (
     <div className="screen start-screen">
       <button className="back-btn" onClick={onBack}>← Home</button>
@@ -64,6 +65,13 @@ export default function GrandmaIntroScreen({ onStart, onBack }: Props) {
       <button className="btn-primary" onClick={onStart}>
         Let's Go
       </button>
+
+      {onHotMode && (
+        <button className="grandma-hot-btn" onClick={onHotMode}>
+          🔥 Hot Mode
+          <span className="grandma-hot-btn-sub">Extreme · 2× Speed</span>
+        </button>
+      )}
     </div>
   );
 }
