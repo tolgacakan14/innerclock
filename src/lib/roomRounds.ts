@@ -33,6 +33,8 @@ export interface RoomWithStatus {
   game_status:          GameStatus;
   selected_mode:        string | null;
   countdown_starts_at:  string | null;
+  countdown_duration?:  number | null;
+  challenge_started_at?: string | null;
   active_round_id:      string | null;
   current_round_number: number | null;
 }
@@ -262,27 +264,67 @@ export async function hostSelectMode(
 
 /**
  * Host starts a synchronized game with a 3-2-1-GO countdown.
- * Sets selected_mode, game_status = 'countdown', countdown_starts_at = now + 3 s.
+ * Sets selected_mode, game_status = 'countdown', countdown_starts_at = now + 3 s,
+ * countdown_duration = 3.
+ *
+ * Returns the confirmed updated row so the caller can patch local state immediately
+ * (countdown ticker fires without waiting for the next 2-second poll).
+ *
+ * Throws a human-readable "migration required" error if the countdown_starts_at
+ * column is missing from the database (PostgreSQL error 42703).
  */
-export async function hostStartGame(roomId: string, mode: string): Promise<void> {
+export async function hostStartGame(
+  roomId: string,
+  mode: string,
+): Promise<{ game_status: string; countdown_starts_at: string; countdown_duration: number }> {
   console.log('[roomRounds] hostStartGame →', { roomId, mode });
   const startsAt = new Date(Date.now() + 3000).toISOString();
+
   const { data, error } = await supabase
     .from('rooms')
     .update({
       selected_mode:       mode,
       game_status:         'countdown',
       countdown_starts_at: startsAt,
+      countdown_duration:  3,
     })
     .eq('id', roomId)
-    .select('id, game_status');
+    .select('id, game_status, countdown_starts_at, countdown_duration');
+
   if (error) {
     const pg = error as { message?: string; code?: string; details?: string; hint?: string };
-    console.error('[roomRounds] hostStartGame error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
+    console.error('[roomRounds] hostStartGame error', {
+      message: pg.message, code: pg.code, details: pg.details, hint: pg.hint,
+    });
+
+    const msg  = (pg.message ?? '').toLowerCase();
+    const code = pg.code ?? '';
+
+    // PostgreSQL 42703 = undefined_column: countdown_starts_at / countdown_duration missing.
+    // Surface a clear migration message instead of the raw schema-cache error.
+    if (
+      code === '42703' ||
+      msg.includes('countdown_starts_at') ||
+      msg.includes('countdown_duration') ||
+      msg.includes('schema cache') ||
+      (msg.includes('column') && msg.includes('does not exist'))
+    ) {
+      throw new Error(
+        'Database migration required — the rooms table is missing countdown columns. ' +
+        'Run this SQL in your Supabase dashboard SQL editor:\n\n' +
+        'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS countdown_starts_at timestamptz;\n' +
+        'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS countdown_duration int DEFAULT 3;\n' +
+        'ALTER TABLE rooms ADD COLUMN IF NOT EXISTS challenge_started_at timestamptz;',
+      );
+    }
+
     throw toError(error);
   }
+
   assertUpdated(data, 'hostStartGame');
-  console.log('[roomRounds] hostStartGame confirmed:', data);
+  const row = (data as Array<{ game_status: string; countdown_starts_at: string; countdown_duration: number }>)[0];
+  console.log('[roomRounds] hostStartGame confirmed:', row);
+  return row;
 }
 
 /**
@@ -344,6 +386,7 @@ export async function setRoomPlaying(roomId: string): Promise<void> {
 
 /**
  * Host resets room back to lobby state.
+ * Falls back gracefully if countdown_starts_at column is not yet in the schema.
  */
 export async function resetRoom(roomId: string): Promise<void> {
   console.log('[roomRounds] resetRoom →', { roomId });
@@ -357,13 +400,35 @@ export async function resetRoom(roomId: string): Promise<void> {
     })
     .eq('id', roomId)
     .select('id, game_status');
-  if (error) {
-    const pg = error as { message?: string; code?: string; details?: string; hint?: string };
-    console.error('[roomRounds] resetRoom error', { message: pg.message, code: pg.code, details: pg.details, hint: pg.hint });
-    throw toError(error);
+
+  if (!error) {
+    assertUpdated(data, 'resetRoom');
+    console.log('[roomRounds] resetRoom confirmed:', data);
+    return;
   }
-  assertUpdated(data, 'resetRoom');
-  console.log('[roomRounds] resetRoom confirmed:', data);
+
+  const pg  = error as { message?: string; code?: string; details?: string; hint?: string };
+  const msg = (pg.message ?? '').toLowerCase();
+  const code = pg.code ?? '';
+  console.error('[roomRounds] resetRoom error', {
+    message: pg.message, code: pg.code, details: pg.details, hint: pg.hint,
+  });
+
+  // 42703 = column missing — retry without countdown_starts_at
+  if (code === '42703' || msg.includes('countdown_starts_at') || msg.includes('schema cache')) {
+    console.warn('[roomRounds] resetRoom: countdown_starts_at missing — retrying without it');
+    const { data: d2, error: e2 } = await supabase
+      .from('rooms')
+      .update({ game_status: 'waiting', selected_mode: null, active_round_id: null })
+      .eq('id', roomId)
+      .select('id, game_status');
+    if (e2) throw toError(e2);
+    assertUpdated(d2, 'resetRoom-fallback');
+    console.log('[roomRounds] resetRoom fallback confirmed:', d2);
+    return;
+  }
+
+  throw toError(error);
 }
 
 // ── 5-Round party system ──────────────────────────────────────────────────────

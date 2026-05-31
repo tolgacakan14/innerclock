@@ -185,10 +185,11 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       return;
     }
 
-    const startTs = new Date(cat).getTime();
+    const startTs  = new Date(cat).getTime();
+    const duration = room?.countdown_duration ?? 3;
 
     const tick = () => {
-      const remaining = 3 - Math.floor((Date.now() - startTs) / 1000);
+      const remaining = duration - Math.floor((Date.now() - startTs) / 1000);
       const clamped   = Math.max(remaining, 0);
       setCdVal(clamped);
 
@@ -216,7 +217,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       if (cdTickRef.current) { clearInterval(cdTickRef.current); cdTickRef.current = null; }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room?.game_status, room?.countdown_starts_at, room?.selected_mode]);
+  }, [room?.game_status, room?.countdown_starts_at, room?.selected_mode, room?.countdown_duration]);
 
   // ── Host identity: multi-layer detection ─────────────────────────────────
   // Primary: DB is authoritative source of truth
@@ -392,9 +393,16 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
     pausePoll();
     setBusy(true); setActionErr('');
     try {
-      await hostStartGame(roomCtx.roomId, selectedMode);
+      const confirmed = await hostStartGame(roomCtx.roomId, selectedMode);
       hasLaunchedRef.current = false;
-      setRoom(prev => prev ? { ...prev, game_status: 'countdown' as GameStatus } : prev);
+      // Apply the confirmed DB result immediately so the countdown ticker
+      // fires right away without waiting for the next 2-second poll.
+      setRoom(prev => prev ? {
+        ...prev,
+        game_status:         confirmed.game_status as GameStatus,
+        countdown_starts_at: confirmed.countdown_starts_at,
+        countdown_duration:  confirmed.countdown_duration,
+      } : prev);
       fetchAll();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
