@@ -465,6 +465,9 @@ body {
 .home-card--golf      { background: linear-gradient(140deg, #071a0d 0%, #050b07 100%); }
 .home-card--grandma   { background: linear-gradient(140deg, #120c1e 0%, #08060d 100%); }
 .home-card--arrowescape { background: linear-gradient(140deg, #060c1e 0%, #04060d 100%); }
+.home-card--sequence  { background: linear-gradient(140deg, #1a1208 0%, #0a0905 100%); }
+.home-card--memory    { background: linear-gradient(140deg, #061218 0%, #040810 100%); }
+.home-card--timing    { background: linear-gradient(140deg, #071a0d 0%, #050c06 100%); }
 
 /* ── Card graphic area ───────────────────────────────────────── */
 .home-card-graphic {
