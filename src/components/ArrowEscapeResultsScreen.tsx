@@ -10,26 +10,32 @@ interface Props {
   roomContext?: RoomContext;
 }
 
-function getMessage(totalTime: number): string {
-  if (totalTime <  90) return 'Escape master.';
-  if (totalTime < 130) return 'Sharp planner.';
-  if (totalTime < 180) return 'Good logic flow.';
-  if (totalTime < 240) return 'You found the exits.';
+function getMessage(finalTime: number): string {
+  if (finalTime <  90) return 'Escape master.';
+  if (finalTime < 130) return 'Sharp planner.';
+  if (finalTime < 180) return 'Good logic flow.';
+  if (finalTime < 240) return 'You found the exits.';
   return 'The arrows trapped you.';
 }
 
+const PENALTY_PER_MISTAKE = 5;
+
 export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAgain, onExit, roomContext }: Props) {
   const [copied, setCopied] = useState(false);
-  const totalTime  = rounds.reduce((s, r) => s + r.solveTime, 0);
-  const totalSecs  = +totalTime.toFixed(1);
-  const message    = getMessage(totalSecs);
-  const fmtTime    = (s: number) => s.toFixed(1) + 's';
+
+  const rawTime      = rounds.reduce((s, r) => s + r.solveTime, 0);
+  const totalMistakes = rounds.reduce((s, r) => s + r.mistakes, 0);
+  const penaltyTime  = totalMistakes * PENALTY_PER_MISTAKE;
+  const finalTime    = +(rawTime + penaltyTime).toFixed(1);
+  const rawSecs      = +rawTime.toFixed(1);
+  const message      = getMessage(finalTime);
+  const fmtTime      = (s: number) => s.toFixed(1) + 's';
 
   function handleCopy() {
     const name = playerName.trim();
     const text = name
-      ? `${name} cleared InnerClock Arrow Escape in ${totalSecs}s. Can you solve faster?`
-      : `I cleared InnerClock Arrow Escape in ${totalSecs}s. Can you solve faster?`;
+      ? `${name} cleared Krone Arrow Escape in ${finalTime}s. Can you solve faster?`
+      : `I cleared Krone Arrow Escape in ${finalTime}s. Can you solve faster?`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -52,14 +58,34 @@ export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAga
         {playerName ? `${playerName}'s Time` : 'Your Time'}
       </p>
 
-      {/* Primary score — total solve time */}
+      {/* Primary score — penalised total time */}
       <div className="final-score">
-        <span className="score-number ae-total-time">{totalSecs}</span>
-        <span className="score-denom">s total</span>
+        <span className="score-number ae-total-time">{finalTime}</span>
+        <span className="score-denom">s</span>
       </div>
 
       <p className="ae-results-hint">Lower is better</p>
       <p className="score-message">{message}</p>
+
+      {/* Time breakdown */}
+      <div className="feedback-rows">
+        <div className="feedback-row">
+          <span>Solve time</span>
+          <span>{fmtTime(rawSecs)}</span>
+        </div>
+        <div className="feedback-row">
+          <span>Wrong taps</span>
+          <span>{totalMistakes}</span>
+        </div>
+        <div className="feedback-row" style={{ color: totalMistakes > 0 ? '#FF453A' : 'inherit' }}>
+          <span>Penalty (+{PENALTY_PER_MISTAKE}s each)</span>
+          <span>+{fmtTime(penaltyTime)}</span>
+        </div>
+        <div className="feedback-row rush-results-total-row">
+          <span>Final time</span>
+          <span>{fmtTime(finalTime)}</span>
+        </div>
+      </div>
 
       {/* Per-round breakdown */}
       <div className="results-list">
@@ -87,8 +113,8 @@ export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAga
         <RoomSubmitPanel
           roomContext={roomContext}
           mode="Arrow Escape"
-          scoreValue={totalSecs}
-          scoreLabel={`${totalSecs}s`}
+          scoreValue={finalTime}
+          scoreLabel={`${finalTime}s`}
           scoreType="lower_is_better"
           onBackToRoom={onExit}
         />

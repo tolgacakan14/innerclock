@@ -48,7 +48,7 @@ export default function ColorFeedbackScreen({
             className="color-swatch-lg"
             style={{ background: `hsl(${target.h}, ${target.s}%, ${target.l}%)` }}
           />
-          <span className="swatch-label">Target color</span>
+          <span className="swatch-label">Target colour</span>
         </div>
         <span className="compare-divider" aria-hidden="true">vs</span>
         <div className="color-compare-item">
@@ -56,7 +56,7 @@ export default function ColorFeedbackScreen({
             className="color-swatch-lg"
             style={{ background: `hsl(${selected.h}, ${selected.s}%, ${selected.l}%)` }}
           />
-          <span className="swatch-label">Your color</span>
+          <span className="swatch-label">Your colour</span>
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const GAME_DURATION = 30;   // seconds
-const TAP_COOLDOWN  = 500;  // ms between taps (prevents spam)
+const TAP_COOLDOWN  = 200;  // ms between taps (prevents spam)
 const GOOD_HALF     = 0.20; // good zone half-width (±20% of center)
 
 // ── Difficulty helpers ────────────────────────────────────────────────────────

@@ -163,7 +163,8 @@ interface Props {
 }
 
 export default function GolfGameScreen({ course, courseIndex, onComplete, onHome }: Props) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const svgRef    = useRef<SVGSVGElement>(null);
+  const svgRectRef = useRef<DOMRect | null>(null);
 
   const ballRef       = useRef({ x: course.ballStart.x, y: course.ballStart.y, vx: 0, vy: 0 });
   const phaseRef      = useRef<Phase>('idle');
@@ -276,18 +277,26 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   }, []);
 
   // ── SVG coords ────────────────────────────────────────────────────────────
+  // Use a cached rect (snapshotted at pointer-down) so that the CSS scale
+  // transition on .golf-game-field doesn't jitter the coordinate transform
+  // mid-gesture.
   function toSVGPoint(clientX: number, clientY: number) {
     const svg = svgRef.current;
     if (!svg) return null;
-    const pt = svg.createSVGPoint();
-    pt.x = clientX; pt.y = clientY;
-    const sp = pt.matrixTransform(svg.getScreenCTM()!.inverse());
-    return { x: sp.x, y: sp.y };
+    const r = svgRectRef.current ?? svg.getBoundingClientRect();
+    return {
+      x: (clientX - r.left) * (VW / r.width),
+      y: (clientY - r.top)  * (VH / r.height),
+    };
   }
 
   // ── Pointer handlers ──────────────────────────────────────────────────────
   function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
     if (phaseRef.current !== 'idle') return;
+    // Snapshot the SVG rect BEFORE the zoom animation starts — any later call
+    // to getBoundingClientRect() during the CSS transition returns a mid-animation
+    // value that drifts the coordinate mapping.
+    svgRectRef.current = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
     const pt = toSVGPoint(e.clientX, e.clientY);
     if (!pt) return;
     const b = ballRef.current;
@@ -324,6 +333,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     // Changing the origin simultaneously with the scale-back animation would
     // make the field appear to drift/slide, which feels broken.
     setAimScale(1);
+    svgRectRef.current = null;
     if (phaseRef.current !== 'aiming') return;
 
     const anchor  = aimAnchorRef.current;

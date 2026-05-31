@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GrandmaPattern } from '../data/grandmaPatterns';
 
+// ── Falling KRONE ticket (Last Dance / Virgin Mode visual) ────────────────────
+interface GrandmaTicket {
+  id:       number;
+  left:     number;   // % of field width
+  delay:    number;   // animation-delay ms
+  duration: number;   // fall duration ms
+  rotate:   number;   // initial tilt deg
+}
+
 // ── Canvas / world constants ──────────────────────────────────────────────────
 const CW         = 800;   // canvas logical width
 const CH         = 380;   // canvas logical height
@@ -1218,7 +1227,10 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   const [countdownActive, setCountdownActive] = useState(true);
   const [levelBanner,     setLevelBanner]     = useState<LevelName | null>(null);
   const [virginMode,      setVirginMode]      = useState(false);
-  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastDanceActive, setLastDanceActive] = useState(false);
+  const [tickets,         setTickets]         = useState<GrandmaTicket[]>([]);
+  const bannerTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ticketIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Portrait / orientation support ───────────────────────────────────────
   function calcOrient() {
@@ -1240,6 +1252,57 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       window.removeEventListener('orientationchange', update);
     };
   }, []);
+
+  // ── Falling KRONE tickets — Last Dance (level 5+) ───────────────────────────
+  useEffect(() => {
+    if (!lastDanceActive) return;
+    function spawnTickets(count: number) {
+      if (!gsRef.current.alive) return;
+      setTickets(prev => {
+        const kept = prev.slice(-20);
+        const batch: GrandmaTicket[] = Array.from({ length: count }, () => ({
+          id:       performance.now() + Math.random(),
+          left:     4 + Math.random() * 88,
+          delay:    Math.random() * 250,
+          duration: 1900 + Math.random() * 900,
+          rotate:   (Math.random() - 0.5) * 44,
+        }));
+        return [...kept, ...batch];
+      });
+    }
+    spawnTickets(4); // initial burst
+    ticketIntervalRef.current = setInterval(() => {
+      if (!gsRef.current.alive) { clearInterval(ticketIntervalRef.current!); return; }
+      spawnTickets(2);
+    }, 750);
+    return () => { clearInterval(ticketIntervalRef.current!); ticketIntervalRef.current = null; };
+  }, [lastDanceActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Falling KRONE tickets — Virgin Mode (level 6+): denser shower ───────────
+  useEffect(() => {
+    if (!virginMode) return;
+    clearInterval(ticketIntervalRef.current!);
+    function spawnTickets(count: number) {
+      if (!gsRef.current.alive) return;
+      setTickets(prev => {
+        const kept = prev.slice(-30);
+        const batch: GrandmaTicket[] = Array.from({ length: count }, () => ({
+          id:       performance.now() + Math.random(),
+          left:     4 + Math.random() * 88,
+          delay:    Math.random() * 100,
+          duration: 1400 + Math.random() * 600,
+          rotate:   (Math.random() - 0.5) * 65,
+        }));
+        return [...kept, ...batch];
+      });
+    }
+    spawnTickets(7); // bigger burst for Virgin Mode
+    ticketIntervalRef.current = setInterval(() => {
+      if (!gsRef.current.alive) { clearInterval(ticketIntervalRef.current!); return; }
+      spawnTickets(3);
+    }, 420);
+    return () => { clearInterval(ticketIntervalRef.current!); ticketIntervalRef.current = null; };
+  }, [virginMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Countdown ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1389,6 +1452,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
         const bannerDur = newLevel >= 5 ? 2400 : 1900;
         bannerTimerRef.current = setTimeout(() => setLevelBanner(null), bannerDur);
+        if (newLevel >= 5) setLastDanceActive(true);
         if (newLevel >= 6) setVirginMode(true);
       }
 
@@ -1640,7 +1704,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
 
       {/* Canvas + overlays */}
       <div
-        className={`grandma-game-field${virginMode ? ' grandma-game-field--virgin' : ''}${isHot ? ' grandma-game-field--hot' : ''}${isPortrait ? ' grandma-game-field--portrait' : ''}`}
+        className={`grandma-game-field${isPortrait ? ' grandma-game-field--portrait' : ''}`}
         style={isPortrait ? {
           position:        'absolute' as const,
           top:             '50%',
@@ -1651,36 +1715,56 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
           transformOrigin: 'center center',
         } : { position: 'relative' as const }}
       >
-        {isHot && (
-          <div className="grandma-hot-badge" aria-hidden="true">
-            🔥 HOT MODE
+        {/* Inner wrapper receives the shake animations — keeps field transform clean */}
+        <div className={`grandma-game-inner${virginMode ? ' grandma-game-inner--virgin' : ''}${isHot ? ' grandma-game-inner--hot' : ''}`}>
+          {isHot && (
+            <div className="grandma-hot-badge" aria-hidden="true">
+              🔥 HOT MODE
+            </div>
+          )}
+
+          <canvas
+            ref={canvasRef}
+            className="grandma-game-canvas"
+            width={CW}
+            height={CH}
+          />
+
+          {/* Level-up banner */}
+          {levelBanner && (
+            <div className={`grandma-level-banner${levelBanner === 'Virgin Mode' ? ' grandma-level-banner--shake' : ''}`} key={levelBanner}>
+              <span className={[
+                'grandma-level-name',
+                levelBanner === 'Menopause'   ? 'grandma-level-name--prime'      : '',
+                levelBanner === 'Last Dance'  ? 'grandma-level-name--lastbreath' : '',
+                levelBanner === 'Virgin Mode' ? 'grandma-level-name--virgin'     : '',
+              ].filter(Boolean).join(' ')}>
+                {levelBanner}
+              </span>
+            </div>
+          )}
+
+          <div className="grandma-touch-zones" aria-hidden="true">
+            <div className="grandma-touch-zone grandma-touch-zone--jump">JUMP</div>
+            <div className="grandma-touch-zone grandma-touch-zone--crouch">DUCK</div>
           </div>
-        )}
 
-        <canvas
-          ref={canvasRef}
-          className="grandma-game-canvas"
-          width={CW}
-          height={CH}
-        />
-
-        {/* Level-up banner */}
-        {levelBanner && (
-          <div className={`grandma-level-banner${levelBanner === 'Virgin Mode' ? ' grandma-level-banner--shake' : ''}`} key={levelBanner}>
-            <span className={[
-              'grandma-level-name',
-              levelBanner === 'Menopause'   ? 'grandma-level-name--prime'      : '',
-              levelBanner === 'Last Dance'  ? 'grandma-level-name--lastbreath' : '',
-              levelBanner === 'Virgin Mode' ? 'grandma-level-name--virgin'     : '',
-            ].filter(Boolean).join(' ')}>
-              {levelBanner}
-            </span>
-          </div>
-        )}
-
-        <div className="grandma-touch-zones" aria-hidden="true">
-          <div className="grandma-touch-zone grandma-touch-zone--jump">JUMP</div>
-          <div className="grandma-touch-zone grandma-touch-zone--crouch">DUCK</div>
+          {/* Falling KRONE tickets — Last Dance & Virgin Mode */}
+          {tickets.map(tk => (
+            <div
+              key={tk.id}
+              className="grandma-ticket"
+              style={{
+                left:              `${tk.left}%`,
+                animationDelay:    `${tk.delay}ms`,
+                animationDuration: `${tk.duration}ms`,
+                '--tk-rotate':     `${tk.rotate}deg`,
+              } as React.CSSProperties}
+              onAnimationEnd={() => setTickets(prev => prev.filter(t => t.id !== tk.id))}
+            >
+              KRONE
+            </div>
+          ))}
         </div>
       </div>
 

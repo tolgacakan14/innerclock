@@ -11,28 +11,28 @@ interface Props {
   roomContext?:      RoomContext;
 }
 
-function getMessage(score: number): string {
-  if (score >= 200) return 'Flawless pattern memory.';
-  if (score >= 130) return 'Impressive recall.';
-  if (score >= 80)  return 'Good concentration.';
-  if (score >= 40)  return 'Keep practising.';
+function getMessage(levels: number): string {
+  if (levels >= 15) return 'Flawless pattern memory.';
+  if (levels >= 10) return 'Impressive recall.';
+  if (levels >= 6)  return 'Good concentration.';
+  if (levels >= 3)  return 'Keep practising.';
   return 'Sequences are tricky — try again!';
 }
 
 export default function SequenceTapResultScreen({
-  completedLevels, maxSequenceLength, score, playerName, onPlayAgain, onExit, roomContext,
+  completedLevels, maxSequenceLength, playerName, onPlayAgain, onExit, roomContext,
 }: Props) {
-  const message = getMessage(score);
+  const message = getMessage(completedLevels);
 
   return (
     <div className="screen results-screen">
       <p className="results-player-name">
-        {playerName ? `${playerName}'s Score` : 'Your Score'}
+        {playerName ? `${playerName}'s Result` : 'Your Result'}
       </p>
 
       <div className="final-score">
-        <span className="score-number">{score}</span>
-        <span className="score-denom">pts</span>
+        <span className="score-number">{completedLevels}</span>
+        <span className="score-denom">levels</span>
       </div>
 
       <p className="score-message">{message}</p>
@@ -40,15 +40,11 @@ export default function SequenceTapResultScreen({
       <div className="feedback-rows">
         <div className="feedback-row">
           <span>Levels completed</span>
-          <span>{completedLevels} × 10 = {completedLevels * 10} pts</span>
+          <span>{completedLevels}</span>
         </div>
         <div className="feedback-row">
-          <span>Max sequence length</span>
-          <span>{maxSequenceLength} × 5 = {maxSequenceLength * 5} pts</span>
-        </div>
-        <div className="feedback-row rush-results-total-row">
-          <span>Total</span>
-          <span>{score} pts</span>
+          <span>Longest sequence</span>
+          <span>{maxSequenceLength} taps</span>
         </div>
       </div>
 
@@ -61,8 +57,8 @@ export default function SequenceTapResultScreen({
         <RoomSubmitPanel
           roomContext={roomContext}
           mode="Sequence Tap"
-          scoreValue={score}
-          scoreLabel={`${score} pts`}
+          scoreValue={completedLevels}
+          scoreLabel={`Level ${completedLevels}`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
         />

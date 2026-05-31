@@ -57,7 +57,8 @@ export default function SoloApp() {
             </svg>
           </div>
           <h1 className="home-logo name-screen-logo">Krone</h1>
-          <p className="home-tagline">Train your perception.</p>
+          <p className="home-tagline">Fast games. Real rivalries.</p>
+          <p className="home-tagline-sub">Play with friends · Same room · Real competition</p>
         </div>
 
         {/* Mode selector */}
@@ -133,6 +134,8 @@ export default function SoloApp() {
         playerName={playerName}
         onSelect={mode => setView(mode as SoloView)}
         onChangeName={() => setView('name')}
+        onCreateRoom={() => setView('create-room')}
+        onJoinRoom={() => setView('join-room')}
       />
     );
   }

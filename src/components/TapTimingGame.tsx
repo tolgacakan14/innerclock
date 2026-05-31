@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBackgroundMusic }  from '../hooks/useBackgroundMusic';
 import TapTimingGameScreen     from './TapTimingGameScreen';
 import TapTimingResultScreen   from './TapTimingResultScreen';
@@ -13,6 +13,7 @@ interface Props {
 
 export default function TapTimingGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }   = useBackgroundMusic();
+  useEffect(() => { setTrack('main'); }, []);
   const [screen,       setScreen]       = useState<Screen>('playing');
   const [finalPerfects,setFinalPerfects]= useState(0);
   const [finalGoods,   setFinalGoods]   = useState(0);

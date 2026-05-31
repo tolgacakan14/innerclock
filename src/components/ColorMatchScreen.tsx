@@ -156,7 +156,7 @@ export default function ColorMatchScreen({ roundIndex, totalRounds, onSubmit, on
             className={`color-submit-pill flex-1 ${isLight ? 'color-submit-pill--dark' : 'color-submit-pill--light'}`}
             onClick={handleSubmit}
           >
-            <span>Submit shade</span>
+            <span>Submit colour</span>
             <span className="submit-pill-arrow">→</span>
           </button>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBackgroundMusic }      from '../hooks/useBackgroundMusic';
 import SequenceTapGameScreen       from './SequenceTapGameScreen';
 import SequenceTapResultScreen     from './SequenceTapResultScreen';
@@ -13,6 +13,7 @@ interface Props {
 
 export default function SequenceTapGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }   = useBackgroundMusic();
+  useEffect(() => { setTrack('main'); }, []);
   const [screen,          setScreen]          = useState<Screen>('playing');
   const [completedLevels, setCompletedLevels] = useState(0);
   const [maxSeqLen,       setMaxSeqLen]       = useState(0);

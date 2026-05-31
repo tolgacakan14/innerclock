@@ -353,6 +353,12 @@ body {
   100% { transform: translateY(0px); }
 }
 .home-tagline { font-size: 0.9rem; color: var(--muted); letter-spacing: 0.01em; }
+.home-tagline-sub {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.28);
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
 
 /* ── Player row ──────────────────────────────────────────────── */
 .home-player {
@@ -2511,6 +2517,19 @@ body {
   align-items: stretch;
 }
 
+/*
+ * Inner wrapper lives INSIDE the field div.
+ * Shake / hot animations target this wrapper so the field's
+ * portrait transform (rotate -90deg + scale) is never overridden by CSS animation.
+ */
+.grandma-game-inner {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
 .grandma-game-canvas {
   display: block;
   width: 100%;
@@ -3378,8 +3397,12 @@ body {
   to   { letter-spacing: 0.14em; filter: drop-shadow(0 0 32px rgba(255,30,255,1.00)) drop-shadow(0 0 70px rgba(200,0,255,0.70)); }
 }
 
-/* Canvas field shakes in Virgin Mode (level 6, 50 s+) */
-.grandma-game-field--virgin {
+/*
+ * Shake animations target .grandma-game-inner (NOT .grandma-game-field).
+ * This keeps the field's portrait inline transform (rotate -90deg + scale)
+ * untouched — the inner wrapper shakes inside it without overriding it.
+ */
+.grandma-game-inner--virgin {
   animation: virginShake 0.22s ease-in-out infinite;
 }
 
@@ -3396,8 +3419,58 @@ body {
 
 /* Portrait-mode: game canvas container rotated -90° inside fixed wrap */
 .grandma-game-field--portrait {
-  /* Explicit size set by inline style; overflow kept hidden */
-  overflow: visible; /* allow rotated canvas to exceed original bounds */
+  /* overflow: visible lets rotated inner content remain visible */
+  overflow: visible;
+}
+
+/* ── Grandma — Falling KRONE tickets (Last Dance + Virgin Mode) ─────────── */
+/*
+ * Ticket stubs that fall from the top of the game field during Last Dance and
+ * Virgin Mode. They live inside .grandma-game-inner so they rotate with the
+ * portrait-mode canvas — falling "downward" from the player's perspective in
+ * both landscape and portrait orientations.
+ */
+.grandma-ticket {
+  position: absolute;
+  top: -38px;
+  z-index: 5;
+  pointer-events: none;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #1a0a2e 0%, #160a3e 50%, #2a0f60 100%);
+  border: 1px solid rgba(220, 30, 255, 0.60);
+  color: rgba(220, 30, 255, 0.92);
+  font-size: 0.50rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.60),
+    0 0 10px rgba(180, 0, 255, 0.22),
+    inset 0 1px 0 rgba(220, 30, 255, 0.18);
+  outline: 1px dashed rgba(220, 30, 255, 0.28);
+  /* duration is overridden per-ticket via inline animationDuration style */
+  animation: grandmaTicketFall 2000ms ease-in both;
+  transform-origin: center top;
+}
+
+@keyframes grandmaTicketFall {
+  0% {
+    transform: translateY(0) rotate(var(--tk-rotate, 0deg)) scale(0.72);
+    opacity: 0.90;
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(50px) rotate(calc(var(--tk-rotate, 0deg) * 1.15)) scale(0.86);
+  }
+  82% {
+    opacity: 0.60;
+  }
+  100% {
+    transform: translateY(110vh) rotate(calc(var(--tk-rotate, 0deg) * 2.8)) scale(0.78);
+    opacity: 0;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -4909,10 +4982,10 @@ body {
   right: 0;
   bottom: 0;
   z-index: 2;
-  padding: 0 16px max(20px, env(safe-area-inset-bottom, 20px)) 16px;
+  padding: 0 16px max(16px, env(safe-area-inset-bottom, 16px)) 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   /* frosted glass backing so panel is readable over any hue */
   background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.55) 22%);
 }
@@ -4931,7 +5004,7 @@ body {
 .cpk-sv-canvas {
   position: relative;
   width: 100%;
-  height: clamp(110px, 22vw, 155px);
+  height: clamp(80px, 16vw, 115px);
   border-radius: 14px;
   background: var(--cpk-hue, hsl(210,100%,50%));
   overflow: hidden;
@@ -4972,8 +5045,8 @@ body {
 .cpk-hue-bar {
   position: relative;
   width: 100%;
-  height: 38px;
-  border-radius: 19px;
+  height: 30px;
+  border-radius: 15px;
   background: linear-gradient(to right,
     hsl(0,100%,50%)   0%,
     hsl(30,100%,50%)  8.33%,
@@ -4998,8 +5071,8 @@ body {
 .cpk-hue-thumb {
   position: absolute;
   top: 50%;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 3px solid rgba(255,255,255,0.92);
   transform: translate(-50%, -50%);
@@ -5017,9 +5090,9 @@ body {
 /* Square swatch showing the exact chosen colour */
 .cpk-swatch {
   flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   border: 2px solid rgba(255,255,255,0.22);
   box-shadow: 0 3px 12px rgba(0,0,0,0.45);
 }
@@ -5379,16 +5452,22 @@ body {
 .mg-grid {
   display: grid;
   grid-template-columns: repeat(var(--mg-cols, 3), 1fr);
-  /* Tighter gap on small screens / many columns so the grid fits without overflow */
-  gap: clamp(4px, 1.6vw, 9px);
-  padding: 10px 18px;
-  flex: 1;
-  /* min-height: 0 prevents the flex child from growing past the container */
-  min-height: 0;
-  width: 100%;
-  max-width: 440px;
+  /*
+   * Square grid sized to fit within both the viewport width and the available
+   * vertical space.  min() picks the smaller of:
+   *   – horizontal: full width minus side margins (32px total)
+   *   – vertical:   dvh minus header + status + info chrome (~180px)
+   *   – hard cap:   440px (looks fine on large tablets)
+   * aspect-ratio:1/1 keeps it square no matter how many columns there are.
+   */
+  width: min(calc(100vw - 32px), calc(100dvh - 180px), 440px);
+  aspect-ratio: 1 / 1;
+  /* Tighter gap on small screens */
+  gap: clamp(3px, 1.3vw, 8px);
+  flex: none;
+  margin: auto;
+  padding: 0;
   box-sizing: border-box;
-  align-content: center;
   overflow: hidden;
 }
 
@@ -5659,4 +5738,46 @@ body {
   padding-bottom: max(28px, env(safe-area-inset-bottom));
   flex-shrink: 0;
   letter-spacing: 0.1px;
+}
+
+/* ── Play with Friends bar (ModeSelectScreen) ──────────────────────────────── */
+.home-friends-bar {
+  width: 100%;
+  margin-top: 4px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.home-friends-label {
+  font-size: 0.80rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.50);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.home-friends-actions {
+  display: flex;
+  gap: 8px;
+}
+.home-friends-btn {
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.80);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, transform 120ms ease;
+  letter-spacing: 0.01em;
+}
+.home-friends-btn:active {
+  background: rgba(255,255,255,0.14);
+  transform: scale(0.96);
 }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ArrowEscapeRoundResult } from '../types';
 import { arrowEscapeBoards }          from '../data/arrowEscapeBoards';
+import { useBackgroundMusic }         from '../hooks/useBackgroundMusic';
 import ArrowEscapeIntroScreen         from './ArrowEscapeIntroScreen';
 import ArrowEscapeGameScreen          from './ArrowEscapeGameScreen';
 import ArrowEscapeRoundResultScreen   from './ArrowEscapeRoundResultScreen';
@@ -15,18 +16,24 @@ interface Props {
 }
 
 /**
- * Pick exactly 3 boards — one from each difficulty tier — always in escalating
- * order: medium → hard → expert.
- * Within each tier, one board is chosen at random so every game feels fresh.
+ * Pick exactly 3 boards for one session.
+ * Rounds 1 & 2: two distinct boards from the mediumHard pool (Fisher-Yates,
+ * no repeat within the same session).
+ * Round 3: one board at random from the finalHard pool.
  */
 function pickBoards() {
-  function rand<T>(arr: T[]): T {
-    return arr[Math.floor(Math.random() * arr.length)];
+  const medPool  = arrowEscapeBoards.filter(b => b.difficulty === 'mediumHard');
+  const finPool  = arrowEscapeBoards.filter(b => b.difficulty === 'finalHard');
+
+  // Fisher-Yates shuffle a copy so rounds 1 & 2 are always different boards
+  const shuffled = [...medPool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const medium = arrowEscapeBoards.filter(b => b.difficulty === 'medium');
-  const hard   = arrowEscapeBoards.filter(b => b.difficulty === 'hard');
-  const expert = arrowEscapeBoards.filter(b => b.difficulty === 'expert');
-  const picked = [rand(medium), rand(hard), rand(expert)];
+
+  const r3     = finPool[Math.floor(Math.random() * finPool.length)];
+  const picked = [shuffled[0], shuffled[1], r3];
 
   if (import.meta.env.DEV) {
     const ids   = picked.map(b => b.id);
@@ -39,6 +46,8 @@ function pickBoards() {
 }
 
 export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Props) {
+  const { setTrack } = useBackgroundMusic();
+  useEffect(() => { setTrack('main'); return () => { setTrack('main'); }; }, []);
   const [screen,       setScreen]       = useState<AEScreen>('intro');
   const [selected,     setSelected]     = useState(() => pickBoards());
   const [currentRound, setCurrentRound] = useState(0);

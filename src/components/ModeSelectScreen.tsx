@@ -3,9 +3,11 @@ import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape' | 'sequence' | 'memory' | 'timing';
 
 interface Props {
-  playerName:   string;
-  onSelect:     (mode: GameMode) => void;
-  onChangeName: () => void;
+  playerName:    string;
+  onSelect:      (mode: GameMode) => void;
+  onChangeName:  () => void;
+  onCreateRoom?: () => void;
+  onJoinRoom?:   () => void;
 }
 
 // ── Card SVG graphics ─────────────────────────────────────────────────────────
@@ -440,7 +442,7 @@ function ArrowEscapeGraphic() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ModeSelectScreen({ playerName, onSelect, onChangeName }: Props) {
+export default function ModeSelectScreen({ playerName, onSelect, onChangeName, onCreateRoom, onJoinRoom }: Props) {
   const { enabled, toggle } = useBackgroundMusic();
 
   return (
@@ -556,6 +558,25 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName }:
         </button>
 
       </div>
+
+      {/* ── Play with Friends ────────────────────────────────────── */}
+      {(onCreateRoom || onJoinRoom) && (
+        <div className="home-friends-bar">
+          <span className="home-friends-label">Play with friends</span>
+          <div className="home-friends-actions">
+            {onCreateRoom && (
+              <button className="home-friends-btn" onClick={onCreateRoom}>
+                🏠 Create Room
+              </button>
+            )}
+            {onJoinRoom && (
+              <button className="home-friends-btn" onClick={onJoinRoom}>
+                🔗 Join Room
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

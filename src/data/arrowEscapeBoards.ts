@@ -1,5 +1,5 @@
 /**
- * Arrow Escape — 15 puzzle boards with tiered difficulty.
+ * Arrow Escape — 35 puzzle boards with two difficulty pools.
  *
  * Escape rule: tap arrow at (r,c) pointing dir. It escapes only if
  * NO other arrow exists in its escape lane:
@@ -11,10 +11,9 @@
  * Every board has been manually traced for solvability.
  * Grid is 0-indexed, (0,0) = top-left.
  *
- * Difficulty tiers (one board is drawn from each per game):
- *   medium  — boards 1–5:  8×8 grid, 20 arrows, straightforward chains
- *   hard    — boards 6–10: 8–9×9 grid, 21–22 arrows, tighter chains
- *   expert  — boards 11–15: 9×9 grid, 23–24 arrows, deep cascades
+ * Difficulty pools used by pickBoards():
+ *   mediumHard — boards 1–25:  rounds 1 & 2 (no repeat in same session)
+ *   finalHard  — boards 26–35: round 3 only (much harder, deeper cascades)
  */
 
 export type ArrowDir = 'up' | 'down' | 'left' | 'right';
@@ -32,7 +31,7 @@ export interface ArrowBoard {
   name:       string;
   gridSize:   number;
   arrows:     ArrowItem[];
-  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  difficulty: 'mediumHard' | 'finalHard';
 }
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -59,7 +58,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // which in turn unblocks the left-row chain and vertical chains.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 1, name: 'Iron Gate', gridSize: 8, difficulty: 'medium',
+    id: 1, name: 'Iron Gate', gridSize: 8, difficulty: 'mediumHard',
     arrows: [
       // Row 0 right-sweep: (0,7)→ START → (0,5)→ → (0,3)→ → (0,1)→
       { id:1,  row:0, col:7, dir:'right', color:CY },  // START
@@ -113,7 +112,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // START: (0,7)→ and (7,0)←
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 2, name: 'Crossfire', gridSize: 8, difficulty: 'medium',
+    id: 2, name: 'Crossfire', gridSize: 8, difficulty: 'mediumHard',
     arrows: [
       // TOP row right-sweep (4 arrows)
       { id:1,  row:0, col:7, dir:'right', color:CY },  // START
@@ -159,7 +158,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // chains can proceed. Single START on the center column.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 3, name: 'The Vault', gridSize: 8, difficulty: 'medium',
+    id: 3, name: 'The Vault', gridSize: 8, difficulty: 'mediumHard',
     arrows: [
       // Col 4 up-sweep (7 deep): (0,4)↑ is START, cascades to (6,4)↑
       { id:1,  row:0, col:4, dir:'up',    color:CY },  // START
@@ -198,7 +197,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // Outer spiral of arrows: must clear counter-clockwise from two STARTs.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 4, name: 'Spiral Lock', gridSize: 8, difficulty: 'medium',
+    id: 4, name: 'Spiral Lock', gridSize: 8, difficulty: 'mediumHard',
     arrows: [
       // Top-right corner, right-start
       { id:1,  row:0, col:7, dir:'right', color:CY },   // START
@@ -237,7 +236,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // at least 2 prior removals.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 5, name: 'Deadlock', gridSize: 8, difficulty: 'medium',
+    id: 5, name: 'Deadlock', gridSize: 8, difficulty: 'mediumHard',
     arrows: [
       // SINGLE START: (7,7)↓ — col 7, rows > 7 = nothing.
       { id:1,  row:7, col:7, dir:'down',  color:CY },   // START
@@ -287,7 +286,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 6  "Spider Web"  8×8  22 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 6, name: 'Spider Web', gridSize: 8, difficulty: 'hard',
+    id: 6, name: 'Spider Web', gridSize: 8, difficulty: 'mediumHard',
     arrows: [
       // Two corner starts unlock 4 chains.
       { id:1,  row:0, col:7, dir:'right', color:CY },  // START
@@ -334,7 +333,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 7  "Knot"  9×9  22 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 7, name: 'Knot', gridSize: 9, difficulty: 'hard',
+    id: 7, name: 'Knot', gridSize: 9, difficulty: 'mediumHard',
     arrows: [
       // Col 8 down-sweep (4 arrows): (8,8)↓ START
       { id:1,  row:8, col:8, dir:'down',  color:CY },  // START
@@ -375,7 +374,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // Maximum interlocking. Four chains, each dependent on at least one other.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 8, name: 'Pressure Grid', gridSize: 9, difficulty: 'hard',
+    id: 8, name: 'Pressure Grid', gridSize: 9, difficulty: 'mediumHard',
     arrows: [
       // Chain A: Col 8 down (4): (8,8)↓ START
       { id:1,  row:8, col:8, dir:'down',  color:CY },
@@ -416,7 +415,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 9  "Labyrinth"  9×9  23 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 9, name: 'Labyrinth', gridSize: 9, difficulty: 'hard',
+    id: 9, name: 'Labyrinth', gridSize: 9, difficulty: 'mediumHard',
     arrows: [
       // Single start: (0,8)→
       { id:1,  row:0, col:8, dir:'right', color:CY },  // START
@@ -456,7 +455,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 10  "Fortress II"  9×9  24 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 10, name: 'Fortress II', gridSize: 9, difficulty: 'hard',
+    id: 10, name: 'Fortress II', gridSize: 9, difficulty: 'mediumHard',
     arrows: [
       // Perimeter first: clear outer ring, then interior explodes.
       // Top-right instant:
@@ -497,7 +496,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 11  "Cascade"  8×8  22 arrows — long single chain with branches
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 11, name: 'Cascade', gridSize: 8, difficulty: 'expert',
+    id: 11, name: 'Cascade', gridSize: 8, difficulty: 'finalHard',
     arrows: [
       // Phase 1: clear col 7 top-down
       { id:1,  row:0, col:7, dir:'down',  color:CY },  // START (col7 rows>0: id2 below)
@@ -540,7 +539,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 12  "Maze Runner"  9×9  24 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 12, name: 'Maze Runner', gridSize: 9, difficulty: 'expert',
+    id: 12, name: 'Maze Runner', gridSize: 9, difficulty: 'finalHard',
     arrows: [
       // START: corners (0,8)→ and (8,0)←
       { id:1,  row:0, col:8, dir:'right', color:CY },  // START
@@ -578,7 +577,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 13  "Vortex"  9×9  23 arrows
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 13, name: 'Vortex', gridSize: 9, difficulty: 'expert',
+    id: 13, name: 'Vortex', gridSize: 9, difficulty: 'finalHard',
     arrows: [
       // Col 4 full sweep (9 arrows, 0 to 8 up):
       // (0,4)↑ is instant (col4 rows<0 = nothing).
@@ -615,7 +614,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 14  "End Game"  9×9  24 arrows — maximum density
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 14, name: 'End Game', gridSize: 9, difficulty: 'expert',
+    id: 14, name: 'End Game', gridSize: 9, difficulty: 'finalHard',
     arrows: [
       // Two STARTs: top-right and bottom-left
       { id:1,  row:0, col:8, dir:'right', color:CY },
@@ -654,7 +653,7 @@ export const arrowEscapeBoards: ArrowBoard[] = [
   // BOARD 15  "Final Boss"  9×9  24 arrows — hardest
   // ════════════════════════════════════════════════════════════════════════════
   {
-    id: 15, name: 'Final Boss', gridSize: 9, difficulty: 'expert',
+    id: 15, name: 'Final Boss', gridSize: 9, difficulty: 'finalHard',
     arrows: [
       // ONLY ONE instant start: (8,8)↓
       { id:1,  row:8, col:8, dir:'down',  color:CY },  // START
@@ -690,4 +689,677 @@ export const arrowEscapeBoards: ArrowBoard[] = [
     ],
   },
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  mediumHard boards 16–30  (8×8, 20 arrows each)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 16  "Ladder"  8×8  20 arrows
+  // Row-0 right-sweep → col-1 up-chain; col-7 down → row-7 left; col-6 up.
+  // STARTs: (0,7)→  (7,7)↓  (7,0)←  (2,6)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 16, name: 'Ladder', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1 (row0 col7>5)
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:1, col:1, dir:'up',    color:BL },  // blocked by id4 (col1 row0<1)
+      { id:6,  row:3, col:1, dir:'up',    color:PU },  // blocked by id5 (col1 row1<3)
+      { id:7,  row:5, col:1, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:7, col:7, dir:'down',  color:WH },  // START
+      { id:9,  row:5, col:7, dir:'down',  color:CY },  // blocked by id8
+      { id:10, row:3, col:7, dir:'down',  color:GR },  // blocked by id9
+      { id:11, row:3, col:5, dir:'right', color:YL },  // blocked by id10 (row3 col7>5)
+      { id:12, row:3, col:3, dir:'right', color:MG },  // blocked by id11
+      { id:13, row:7, col:0, dir:'left',  color:BL },  // START
+      { id:14, row:7, col:2, dir:'left',  color:PU },  // blocked by id13
+      { id:15, row:7, col:4, dir:'left',  color:OR },  // blocked by id14
+      { id:16, row:7, col:6, dir:'left',  color:WH },  // blocked by id15
+      { id:17, row:5, col:3, dir:'right', color:CY },  // blocked by id9 (row5 col7>3)
+      { id:18, row:2, col:6, dir:'up',    color:GR },  // START (col6 rows<2: nothing)
+      { id:19, row:4, col:6, dir:'up',    color:YL },  // blocked by id18 (col6 row2<4)
+      { id:20, row:6, col:6, dir:'up',    color:MG },  // blocked by id19
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 17  "Cross Sweep"  8×8  20 arrows
+  // Col-0 down, col-7 down; row-0 right; row-7 left; col-3/5 connectors.
+  // STARTs: (7,0)↓  (7,7)↓  (0,7)↑  (7,1)←  (3,4)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 17, name: 'Cross Sweep', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:7, col:0, dir:'down',  color:CY },  // START
+      { id:2,  row:5, col:0, dir:'down',  color:GR },  // blocked by id1 (col0 row7>5)
+      { id:3,  row:3, col:0, dir:'down',  color:YL },  // blocked by id2
+      { id:4,  row:1, col:0, dir:'down',  color:MG },  // blocked by id3
+      { id:5,  row:7, col:7, dir:'down',  color:BL },  // START
+      { id:6,  row:5, col:7, dir:'down',  color:PU },  // blocked by id5
+      { id:7,  row:3, col:7, dir:'down',  color:OR },  // blocked by id6
+      { id:8,  row:2, col:7, dir:'down',  color:WH },  // blocked by id7 (col7 row3>2)
+      { id:9,  row:0, col:7, dir:'up',    color:CY },  // START (col7 rows<0: nothing)
+      { id:10, row:0, col:6, dir:'right', color:GR },  // blocked by id9 (row0 col7>6)
+      { id:11, row:0, col:4, dir:'right', color:YL },  // blocked by id10
+      { id:12, row:0, col:2, dir:'right', color:MG },  // blocked by id11
+      { id:13, row:7, col:1, dir:'left',  color:BL },  // START (row7 cols<1: nothing)
+      { id:14, row:7, col:3, dir:'left',  color:PU },  // blocked by id13
+      { id:15, row:7, col:5, dir:'left',  color:OR },  // blocked by id14
+      { id:16, row:3, col:4, dir:'up',    color:WH },  // START (col4 rows<3: nothing)
+      { id:17, row:6, col:4, dir:'up',    color:CY },  // blocked by id16 (col4 row3<6)
+      { id:18, row:4, col:3, dir:'down',  color:GR },  // blocked by id14 (col3 row7>4)
+      { id:19, row:2, col:3, dir:'down',  color:YL },  // blocked by id18 (col3 row4>2)
+      { id:20, row:4, col:5, dir:'down',  color:MG },  // blocked by id15 (col5 row7>4)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 18  "Pinwheel"  8×8  20 arrows
+  // Row-0 sweep unlocks col-7 up-chain; row-7 sweep; col-0 down; connectors.
+  // STARTs: (0,7)→  (7,0)←  (0,0)↑  (7,7)↓
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 18, name: 'Pinwheel', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:1, col:7, dir:'up',    color:BL },  // blocked by id1 (col7 row0<1)
+      { id:6,  row:3, col:7, dir:'up',    color:PU },  // blocked by id5
+      { id:7,  row:5, col:7, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:7, col:0, dir:'left',  color:WH },  // START
+      { id:9,  row:7, col:2, dir:'left',  color:CY },  // blocked by id8
+      { id:10, row:7, col:4, dir:'left',  color:GR },  // blocked by id9
+      { id:11, row:7, col:6, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:0, col:0, dir:'up',    color:MG },  // START (col0 rows<0: nothing)
+      { id:13, row:2, col:0, dir:'up',    color:BL },  // blocked by id12 (col0 row0<2)
+      { id:14, row:4, col:0, dir:'up',    color:PU },  // blocked by id13
+      { id:15, row:6, col:0, dir:'up',    color:OR },  // blocked by id14
+      { id:16, row:7, col:7, dir:'down',  color:WH },  // START (col7 rows>7: nothing)
+      { id:17, row:5, col:3, dir:'right', color:CY },  // blocked by id7 (row5 col7>3)
+      { id:18, row:2, col:4, dir:'right', color:GR },  // START (row2 col>4: nothing initially)
+      { id:19, row:4, col:2, dir:'down',  color:YL },  // blocked by id9 (col2 row7>4: id9 at row7 col2 ✓)
+      { id:20, row:6, col:5, dir:'left',  color:MG },  // blocked by id15 (row6 col0<5: id15 at row6 col0 ✓)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 19  "The Bridge"  8×8  20 arrows
+  // Four perimeter chains plus 4 interior cross-blocks.
+  // STARTs: (0,7)→  (7,7)↓  (7,0)←  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 19, name: 'The Bridge', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:7, col:7, dir:'down',  color:BL },  // START
+      { id:6,  row:5, col:7, dir:'down',  color:PU },  // blocked by id5
+      { id:7,  row:3, col:7, dir:'down',  color:OR },  // blocked by id6
+      { id:8,  row:1, col:7, dir:'down',  color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'left',  color:CY },  // START
+      { id:10, row:7, col:2, dir:'left',  color:GR },  // blocked by id9
+      { id:11, row:7, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:7, col:6, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:0, col:0, dir:'up',    color:BL },  // START
+      { id:14, row:2, col:0, dir:'up',    color:PU },  // blocked by id13
+      { id:15, row:4, col:0, dir:'up',    color:OR },  // blocked by id14
+      { id:16, row:6, col:0, dir:'up',    color:WH },  // blocked by id15
+      { id:17, row:5, col:3, dir:'right', color:CY },  // blocked by id6 (row5 col7>3)
+      { id:18, row:3, col:4, dir:'down',  color:GR },  // blocked by id11 (col4 row7>3)
+      { id:19, row:2, col:4, dir:'up',    color:YL },  // START (col4 rows<2: nothing)
+      { id:20, row:4, col:5, dir:'left',  color:MG },  // blocked by id15 (row4 col0<5)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 20  "Switchback"  8×8  20 arrows
+  // Row-0 sweep feeds col-1 up-chain; that chain cross-blocks row-7.
+  // STARTs: (0,7)→  (7,0)←  (7,7)↓  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 20, name: 'Switchback', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:1, col:1, dir:'up',    color:BL },  // blocked by id4 (col1 row0<1)
+      { id:6,  row:3, col:1, dir:'up',    color:PU },  // blocked by id5
+      { id:7,  row:5, col:1, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:7, col:1, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'left',  color:CY },  // START
+      { id:10, row:7, col:2, dir:'left',  color:GR },  // blocked by id8 AND id9 (row7 col1<2 AND col0<2)
+      { id:11, row:7, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:7, col:6, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:7, col:7, dir:'down',  color:BL },  // START
+      { id:14, row:5, col:7, dir:'down',  color:PU },  // blocked by id13
+      { id:15, row:3, col:7, dir:'down',  color:OR },  // blocked by id14
+      { id:16, row:3, col:5, dir:'right', color:WH },  // blocked by id15 (row3 col7>5)
+      { id:17, row:0, col:0, dir:'up',    color:CY },  // START
+      { id:18, row:2, col:0, dir:'up',    color:GR },  // blocked by id17
+      { id:19, row:4, col:0, dir:'up',    color:YL },  // blocked by id18
+      { id:20, row:5, col:4, dir:'right', color:MG },  // blocked by id14 (row5 col7>4)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 21  "Ring Road"  8×8  20 arrows
+  // Perimeter ring with interior connectors.
+  // STARTs: (0,7)→  (0,0)↑  (7,0)←  (7,7)↓
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 21, name: 'Ring Road', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:0, col:0, dir:'up',    color:BL },  // START
+      { id:6,  row:2, col:0, dir:'up',    color:PU },  // blocked by id5
+      { id:7,  row:4, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:6, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'left',  color:CY },  // START
+      { id:10, row:7, col:2, dir:'left',  color:GR },  // blocked by id9
+      { id:11, row:7, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:7, col:6, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:7, col:7, dir:'down',  color:BL },  // START
+      { id:14, row:5, col:7, dir:'down',  color:PU },  // blocked by id13
+      { id:15, row:3, col:7, dir:'down',  color:OR },  // blocked by id14
+      { id:16, row:1, col:7, dir:'down',  color:WH },  // blocked by id15
+      { id:17, row:6, col:3, dir:'left',  color:CY },  // blocked by id8 (row6 col0<3)
+      { id:18, row:6, col:5, dir:'left',  color:GR },  // blocked by id17 (row6 col3<5)
+      { id:19, row:2, col:3, dir:'up',    color:YL },  // START (col3 rows<2: nothing)
+      { id:20, row:5, col:4, dir:'right', color:MG },  // blocked by id14 (row5 col7>4)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 22  "Sawtooth"  8×8  20 arrows
+  // Alternating row-sweeps, each interlocking with vertical connectors.
+  // STARTs: (0,7)→  (2,0)←  (4,7)→  (6,0)←
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 22, name: 'Sawtooth', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:2, col:0, dir:'left',  color:BL },  // START
+      { id:6,  row:2, col:2, dir:'left',  color:PU },  // blocked by id5
+      { id:7,  row:2, col:4, dir:'left',  color:OR },  // blocked by id6
+      { id:8,  row:2, col:6, dir:'left',  color:WH },  // blocked by id7
+      { id:9,  row:4, col:7, dir:'right', color:CY },  // START
+      { id:10, row:4, col:5, dir:'right', color:GR },  // blocked by id9
+      { id:11, row:4, col:3, dir:'right', color:YL },  // blocked by id10
+      { id:12, row:4, col:1, dir:'right', color:MG },  // blocked by id11
+      { id:13, row:6, col:0, dir:'left',  color:BL },  // START
+      { id:14, row:6, col:2, dir:'left',  color:PU },  // blocked by id13
+      { id:15, row:6, col:4, dir:'left',  color:OR },  // blocked by id14
+      { id:16, row:6, col:6, dir:'left',  color:WH },  // blocked by id15
+      { id:17, row:1, col:0, dir:'down',  color:CY },  // blocked by id5 (col0 row2>1)
+      { id:18, row:3, col:7, dir:'down',  color:GR },  // blocked by id9 (col7 row4>3)
+      { id:19, row:5, col:0, dir:'down',  color:YL },  // blocked by id13 (col0 row6>5)
+      { id:20, row:7, col:7, dir:'down',  color:MG },  // START (col7 rows>7: nothing)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 23  "Diagonal"  8×8  20 arrows
+  // Two row sweeps and two col chains forming an X-pattern.
+  // STARTs: (0,0)↑  (2,7)→  (7,4)↓  (0,7)→
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 23, name: 'Diagonal', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:0, dir:'up',    color:CY },  // START
+      { id:2,  row:2, col:0, dir:'up',    color:GR },  // blocked by id1
+      { id:3,  row:4, col:0, dir:'up',    color:YL },  // blocked by id2
+      { id:4,  row:2, col:7, dir:'right', color:MG },  // START
+      { id:5,  row:2, col:5, dir:'right', color:BL },  // blocked by id4
+      { id:6,  row:2, col:3, dir:'right', color:PU },  // blocked by id5
+      { id:7,  row:2, col:1, dir:'right', color:OR },  // blocked by id6
+      { id:8,  row:7, col:4, dir:'down',  color:WH },  // START
+      { id:9,  row:5, col:4, dir:'down',  color:CY },  // blocked by id8
+      { id:10, row:3, col:4, dir:'down',  color:GR },  // blocked by id9
+      { id:11, row:1, col:4, dir:'down',  color:YL },  // blocked by id10
+      { id:12, row:0, col:7, dir:'right', color:MG },  // START
+      { id:13, row:0, col:5, dir:'right', color:BL },  // blocked by id12
+      { id:14, row:0, col:3, dir:'right', color:PU },  // blocked by id13
+      { id:15, row:0, col:1, dir:'right', color:OR },  // blocked by id14
+      { id:16, row:7, col:0, dir:'left',  color:WH },  // START
+      { id:17, row:7, col:2, dir:'left',  color:CY },  // blocked by id16
+      { id:18, row:7, col:6, dir:'left',  color:GR },  // blocked by id17 (row7 col2<6)? Nearest is id17(col2). Also id16(col0) removed. id17 blocks. ✓
+      { id:19, row:5, col:2, dir:'right', color:YL },  // blocked by id9 (row5 col4>2)
+      { id:20, row:3, col:2, dir:'down',  color:MG },  // blocked by id17 (col2 row7>3)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 24  "Mirror"  8×8  20 arrows
+  // Symmetric board: top mirror of bottom, left mirror of right.
+  // STARTs: (0,7)→  (7,7)↓  (7,0)←  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 24, name: 'Mirror', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:4, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:2, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:7, col:7, dir:'down',  color:MG },  // START
+      { id:5,  row:4, col:7, dir:'down',  color:BL },  // blocked by id4
+      { id:6,  row:2, col:7, dir:'down',  color:PU },  // blocked by id5
+      { id:7,  row:7, col:0, dir:'left',  color:OR },  // START
+      { id:8,  row:7, col:3, dir:'left',  color:WH },  // blocked by id7
+      { id:9,  row:7, col:5, dir:'left',  color:CY },  // blocked by id8
+      { id:10, row:0, col:0, dir:'up',    color:GR },  // START
+      { id:11, row:3, col:0, dir:'up',    color:YL },  // blocked by id10
+      { id:12, row:5, col:0, dir:'up',    color:MG },  // blocked by id11
+      { id:13, row:3, col:5, dir:'right', color:BL },  // blocked by id6 (row3 col7>5)
+      { id:14, row:3, col:3, dir:'right', color:PU },  // blocked by id13
+      { id:15, row:4, col:2, dir:'down',  color:OR },  // blocked by id8 (col2 row7>4: id7(row7,col0): wrong col. id8 is (7,3)←. (4,2)↓ checks col2 rows>4. id3(row0,col2): rows>4? NO. id9(row7,col5): wrong col. Nothing in col2 rows>4. START.)
+      // Fix id15: use (4,2)↑ blocked by id3 (col2 row0<4): id3(0,2)→ at row0<4. YES blocked. ✓
+      { id:15, row:4, col:2, dir:'up',    color:OR },  // blocked by id3 (col2 row0<4)
+      { id:16, row:6, col:2, dir:'up',    color:WH },  // blocked by id15 (col2 row4<6)
+      { id:17, row:4, col:4, dir:'left',  color:CY },  // blocked by id10 (row4 col0<4)
+      { id:18, row:2, col:4, dir:'left',  color:GR },  // blocked by id10 (row2 col0<4)
+      { id:19, row:5, col:3, dir:'down',  color:YL },  // blocked by id8 (col3 row7>5: id8 at row7 col3 ✓)
+      { id:20, row:6, col:5, dir:'down',  color:MG },  // blocked by id9 (col5 row7>6: id9 at row7 col5 ✓)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 25  "Funnel"  8×8  21 arrows
+  // Outer chains converge inward to a central locked arrow.
+  // STARTs: (0,7)→  (7,7)↓  (7,0)←  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 25, name: 'Funnel', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:7, col:7, dir:'down',  color:MG },  // START
+      { id:5,  row:5, col:7, dir:'down',  color:BL },  // blocked by id4
+      { id:6,  row:3, col:7, dir:'down',  color:PU },  // blocked by id5
+      { id:7,  row:7, col:0, dir:'left',  color:OR },  // START
+      { id:8,  row:7, col:2, dir:'left',  color:WH },  // blocked by id7
+      { id:9,  row:7, col:4, dir:'left',  color:CY },  // blocked by id8
+      { id:10, row:0, col:0, dir:'up',    color:GR },  // START
+      { id:11, row:2, col:0, dir:'up',    color:YL },  // blocked by id10
+      { id:12, row:4, col:0, dir:'up',    color:MG },  // blocked by id11
+      { id:13, row:3, col:5, dir:'right', color:BL },  // blocked by id6 (row3 col7>5)
+      { id:14, row:3, col:3, dir:'right', color:PU },  // blocked by id13
+      { id:15, row:5, col:3, dir:'right', color:OR },  // blocked by id5 (row5 col7>3)
+      { id:16, row:5, col:1, dir:'right', color:WH },  // blocked by id15 (row5 col3>1)
+      { id:17, row:4, col:2, dir:'down',  color:CY },  // blocked by id9 (col2 row7>4: id8(row7,col2))
+      // Verify: id17 (4,2)↓ checks col2 rows>4: id8(row7,col2) at row7>4 YES. ✓
+      { id:18, row:2, col:2, dir:'down',  color:GR },  // blocked by id17 (col2 row4>2)
+      { id:19, row:4, col:4, dir:'down',  color:YL },  // blocked by id9 (col4 row7>4: id9(row7,col4) ✓)
+      { id:20, row:2, col:4, dir:'down',  color:MG },  // blocked by id19 (col4 row4>2)
+      { id:21, row:4, col:3, dir:'right', color:BL },  // blocked by id19 (row4 col4>3: id19(row4,col4) ✓)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 26  "Weave"  8×8  20 arrows
+  // Four-chain perimeter with interior cross-blocks.
+  // STARTs: (0,7)→  (7,7)↓  (7,0)←  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 26, name: 'Weave', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:7, col:7, dir:'down',  color:BL },  // START
+      { id:6,  row:5, col:7, dir:'down',  color:PU },  // blocked by id5
+      { id:7,  row:3, col:7, dir:'down',  color:OR },  // blocked by id6
+      { id:8,  row:1, col:7, dir:'down',  color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'left',  color:CY },  // START
+      { id:10, row:7, col:2, dir:'left',  color:GR },  // blocked by id9
+      { id:11, row:7, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:7, col:6, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:0, col:0, dir:'up',    color:BL },  // START
+      { id:14, row:2, col:0, dir:'up',    color:PU },  // blocked by id13
+      { id:15, row:4, col:0, dir:'up',    color:OR },  // blocked by id14
+      { id:16, row:6, col:0, dir:'up',    color:WH },  // blocked by id15
+      { id:17, row:5, col:5, dir:'right', color:CY },  // blocked by id6 (row5 col7>5)
+      { id:18, row:3, col:5, dir:'right', color:GR },  // blocked by id7 (row3 col7>5)
+      { id:19, row:4, col:3, dir:'up',    color:YL },  // START (col3 rows<4: nothing)
+      { id:20, row:2, col:5, dir:'up',    color:MG },  // blocked by id2 (col5 row0<2)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 27  "Cascade"  8×8  20 arrows
+  // Chain A feeds col-1 → row-7 cross-block; chain B feeds row-3 right.
+  // STARTs: (0,7)→  (7,0)←  (7,7)↓  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 27, name: 'Cascade', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:1, col:1, dir:'up',    color:BL },  // blocked by id4 (col1 row0<1)
+      { id:6,  row:3, col:1, dir:'up',    color:PU },  // blocked by id5
+      { id:7,  row:5, col:1, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:7, col:1, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'left',  color:CY },  // START
+      { id:10, row:7, col:2, dir:'left',  color:GR },  // blocked by id8 AND id9 (row7 col<2)
+      { id:11, row:7, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:7, col:6, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:7, col:7, dir:'down',  color:BL },  // START
+      { id:14, row:5, col:7, dir:'down',  color:PU },  // blocked by id13
+      { id:15, row:3, col:7, dir:'down',  color:OR },  // blocked by id14
+      { id:16, row:3, col:5, dir:'right', color:WH },  // blocked by id15 (row3 col7>5)
+      { id:17, row:0, col:0, dir:'up',    color:CY },  // START
+      { id:18, row:2, col:0, dir:'up',    color:GR },  // blocked by id17
+      { id:19, row:4, col:0, dir:'up',    color:YL },  // blocked by id18
+      { id:20, row:5, col:4, dir:'right', color:MG },  // blocked by id14 (row5 col7>4)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 28  "Trellis"  8×8  20 arrows
+  // Vertical stakes with horizontal cross-beams.
+  // STARTs: (7,1)↓  (7,5)↓  (0,7)→  (4,7)→
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 28, name: 'Trellis', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:7, col:1, dir:'down',  color:CY },  // START
+      { id:2,  row:5, col:1, dir:'down',  color:GR },  // blocked by id1
+      { id:3,  row:3, col:1, dir:'down',  color:YL },  // blocked by id2
+      { id:4,  row:1, col:1, dir:'down',  color:MG },  // blocked by id3
+      { id:5,  row:7, col:5, dir:'down',  color:BL },  // START
+      { id:6,  row:5, col:5, dir:'down',  color:PU },  // blocked by id5
+      { id:7,  row:3, col:5, dir:'down',  color:OR },  // blocked by id6
+      { id:8,  row:1, col:5, dir:'down',  color:WH },  // blocked by id7
+      { id:9,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:10, row:0, col:5, dir:'right', color:GR },  // blocked by id9
+      { id:11, row:0, col:3, dir:'right', color:YL },  // blocked by id10
+      { id:12, row:0, col:1, dir:'right', color:MG },  // blocked by id11
+      { id:13, row:4, col:7, dir:'right', color:BL },  // START
+      { id:14, row:4, col:5, dir:'right', color:PU },  // blocked by id13
+      { id:15, row:4, col:3, dir:'right', color:OR },  // blocked by id14
+      { id:16, row:4, col:1, dir:'right', color:WH },  // blocked by id15
+      { id:17, row:1, col:3, dir:'left',  color:CY },  // blocked by id4 (row1 col1<3)
+      { id:18, row:3, col:3, dir:'down',  color:GR },  // blocked by id15 (col3 row4>3)
+      { id:19, row:5, col:3, dir:'up',    color:YL },  // blocked by id15 AND id18 (col3 row4<5 and row3<5)
+      { id:20, row:6, col:5, dir:'down',  color:MG },  // blocked by id5 (col5 row7>6)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 29  "Gateway"  8×8  20 arrows
+  // Single-entry cascade fans into three parallel row sweeps + col chain.
+  // STARTs: (7,7)↓  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 29, name: 'Gateway', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:7, col:7, dir:'down',  color:CY },  // START
+      { id:2,  row:5, col:7, dir:'down',  color:GR },  // blocked by id1
+      { id:3,  row:3, col:7, dir:'down',  color:YL },  // blocked by id2
+      { id:4,  row:1, col:7, dir:'down',  color:MG },  // blocked by id3
+      { id:5,  row:3, col:5, dir:'right', color:BL },  // blocked by id3 (row3 col7>5)
+      { id:6,  row:3, col:3, dir:'right', color:PU },  // blocked by id5
+      { id:7,  row:3, col:1, dir:'right', color:OR },  // blocked by id6
+      { id:8,  row:1, col:5, dir:'right', color:WH },  // blocked by id4 (row1 col7>5)
+      { id:9,  row:1, col:3, dir:'right', color:CY },  // blocked by id8
+      { id:10, row:1, col:1, dir:'right', color:GR },  // blocked by id9
+      { id:11, row:5, col:5, dir:'right', color:YL },  // blocked by id2 (row5 col7>5)
+      { id:12, row:5, col:3, dir:'right', color:MG },  // blocked by id11
+      { id:13, row:5, col:1, dir:'right', color:BL },  // blocked by id12
+      { id:14, row:0, col:0, dir:'up',    color:PU },  // START
+      { id:15, row:2, col:0, dir:'up',    color:OR },  // blocked by id14
+      { id:16, row:4, col:0, dir:'up',    color:WH },  // blocked by id15
+      { id:17, row:6, col:0, dir:'up',    color:CY },  // blocked by id16
+      { id:18, row:6, col:2, dir:'left',  color:GR },  // blocked by id17 (row6 col0<2)
+      { id:19, row:6, col:4, dir:'left',  color:YL },  // blocked by id18 (row6 col2<4)
+      { id:20, row:6, col:6, dir:'left',  color:MG },  // blocked by id19 (row6 col4<6)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 30  "Ripple"  8×8  20 arrows
+  // Four perimeter chains + interior cross-blocks on col5 and col3.
+  // STARTs: (0,7)→  (7,0)←  (7,7)↓  (0,0)↑
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 30, name: 'Ripple', gridSize: 8, difficulty: 'mediumHard',
+    arrows: [
+      { id:1,  row:0, col:7, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:5, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:3, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:1, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:7, col:0, dir:'left',  color:BL },  // START
+      { id:6,  row:7, col:2, dir:'left',  color:PU },  // blocked by id5
+      { id:7,  row:7, col:4, dir:'left',  color:OR },  // blocked by id6
+      { id:8,  row:7, col:6, dir:'left',  color:WH },  // blocked by id7
+      { id:9,  row:7, col:7, dir:'down',  color:CY },  // START
+      { id:10, row:5, col:7, dir:'down',  color:GR },  // blocked by id9
+      { id:11, row:3, col:7, dir:'down',  color:YL },  // blocked by id10
+      { id:12, row:1, col:7, dir:'down',  color:MG },  // blocked by id11
+      { id:13, row:0, col:0, dir:'up',    color:BL },  // START
+      { id:14, row:2, col:0, dir:'up',    color:PU },  // blocked by id13
+      { id:15, row:4, col:0, dir:'up',    color:OR },  // blocked by id14
+      { id:16, row:6, col:0, dir:'up',    color:WH },  // blocked by id15
+      { id:17, row:5, col:5, dir:'right', color:CY },  // blocked by id10 (row5 col7>5)
+      { id:18, row:3, col:5, dir:'right', color:GR },  // blocked by id11 (row3 col7>5)
+      { id:19, row:2, col:3, dir:'up',    color:YL },  // blocked by id3 (col3 row0<2)
+      { id:20, row:4, col:5, dir:'up',    color:MG },  // blocked by id2 (col5 row0<4)
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  finalHard boards 31–35  (9×9, 24 arrows each — deep cascades)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 31  "Deep Maze"  9×9  24 arrows
+  // Row-0 sweep feeds 9-deep col-0 cascade; col-8 and row-8 add complexity.
+  // STARTs: (0,8)→  (8,8)↓  (8,0)←
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 31, name: 'Deep Maze', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      { id:1,  row:0, col:8, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:6, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:4, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:2, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:0, col:0, dir:'right', color:BL },  // blocked by id4
+      { id:6,  row:1, col:0, dir:'up',    color:PU },  // blocked by id5 (col0 row0<1)
+      { id:7,  row:3, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:5, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'up',    color:CY },  // blocked by id8
+      { id:10, row:8, col:8, dir:'down',  color:GR },  // START
+      { id:11, row:6, col:8, dir:'down',  color:YL },  // blocked by id10
+      { id:12, row:4, col:8, dir:'down',  color:MG },  // blocked by id11
+      { id:13, row:2, col:8, dir:'down',  color:BL },  // blocked by id12
+      { id:14, row:8, col:0, dir:'left',  color:PU },  // START
+      { id:15, row:8, col:2, dir:'left',  color:OR },  // blocked by id14
+      { id:16, row:8, col:4, dir:'left',  color:WH },  // blocked by id15
+      { id:17, row:8, col:6, dir:'left',  color:CY },  // blocked by id16
+      { id:18, row:7, col:6, dir:'left',  color:GR },  // blocked by id9 (row7 col0<6)
+      { id:19, row:7, col:4, dir:'left',  color:YL },  // blocked by id9 (row7 col0<4)
+      { id:20, row:7, col:2, dir:'left',  color:MG },  // blocked by id9 (row7 col0<2)
+      { id:21, row:5, col:6, dir:'left',  color:BL },  // blocked by id8 (row5 col0<6)
+      { id:22, row:3, col:6, dir:'left',  color:PU },  // blocked by id7 (row3 col0<6)
+      { id:23, row:1, col:6, dir:'left',  color:OR },  // blocked by id6 (row1 col0<6)
+      { id:24, row:3, col:4, dir:'left',  color:WH },  // blocked by id7 (row3 col0<4)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 32  "Overlock"  9×9  24 arrows
+  // Two crossing deep sweeps with col chains on both sides.
+  // STARTs: (0,8)→  (8,0)←  (0,0)↑  (8,8)↓
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 32, name: 'Overlock', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      { id:1,  row:0, col:8, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:6, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:4, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:2, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:0, col:0, dir:'right', color:BL },  // blocked by id4
+      { id:6,  row:1, col:0, dir:'up',    color:PU },  // blocked by id5 (col0 row0<1)
+      { id:7,  row:3, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:5, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'up',    color:CY },  // blocked by id8
+      { id:10, row:8, col:0, dir:'left',  color:GR },  // START
+      { id:11, row:8, col:2, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:8, col:4, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:8, col:6, dir:'left',  color:BL },  // blocked by id12
+      { id:14, row:8, col:8, dir:'left',  color:PU },  // blocked by id13
+      { id:15, row:7, col:8, dir:'down',  color:OR },  // blocked by id14 (col8 row8>7)
+      { id:16, row:5, col:8, dir:'down',  color:WH },  // blocked by id14 (col8 row8>5)
+      { id:17, row:3, col:8, dir:'down',  color:CY },  // blocked by id14 (col8 row8>3)
+      { id:18, row:1, col:8, dir:'down',  color:GR },  // blocked by id14 (col8 row8>1)
+      { id:19, row:7, col:4, dir:'right', color:YL },  // blocked by id16 (row7 col8>4: id15 at col8 row7 ✓)
+      { id:20, row:5, col:4, dir:'right', color:MG },  // blocked by id16 (row5 col8>4: id16 at col8 row5 ✓)
+      { id:21, row:3, col:4, dir:'right', color:BL },  // blocked by id17 (row3 col8>4: id17 at col8 row3 ✓)
+      { id:22, row:6, col:2, dir:'down',  color:PU },  // blocked by id10 (col2 row8>6: id11 at row8 col2. ✓)
+      { id:23, row:4, col:2, dir:'down',  color:OR },  // blocked by id22 (col2 row6>4)
+      { id:24, row:2, col:2, dir:'down',  color:WH },  // blocked by id23 (col2 row4>2)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 33  "Abyssal"  9×9  24 arrows
+  // Four perimeter chains + two interior col chains crossing the middle.
+  // STARTs: (0,8)→  (8,0)←
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 33, name: 'Abyssal', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      // Chain A — row-0 right sweep
+      { id:1,  row:0, col:8, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:6, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:4, dir:'right', color:YL },  // blocked by id2 → unlocks id19
+      { id:4,  row:0, col:2, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:0, col:0, dir:'right', color:BL },  // blocked by id4 → unlocks id6
+      // Chain B — col-0 up, unlocked by id5
+      { id:6,  row:1, col:0, dir:'up',    color:PU },  // blocked by id5 (col0 row0<1)
+      { id:7,  row:3, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:5, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'up',    color:CY },  // blocked by id8
+      // Chain C — row-8 left sweep (independent START)
+      { id:10, row:8, col:0, dir:'left',  color:GR },  // START
+      { id:11, row:8, col:2, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:8, col:4, dir:'left',  color:MG },  // blocked by id11
+      { id:13, row:8, col:6, dir:'left',  color:BL },  // blocked by id12 → unlocks id22
+      { id:14, row:8, col:8, dir:'left',  color:PU },  // blocked by id13 → unlocks id15
+      // Chain D — col-8 down, unlocked by id14
+      { id:15, row:7, col:8, dir:'down',  color:OR },  // blocked by id14 (col8 row8>7)
+      { id:16, row:5, col:8, dir:'down',  color:WH },  // blocked by id15
+      { id:17, row:3, col:8, dir:'down',  color:CY },  // blocked by id16
+      { id:18, row:1, col:8, dir:'down',  color:GR },  // blocked by id17
+      // Chain E — col-4 up, unlocked by id3 (0,4)→
+      { id:19, row:2, col:4, dir:'up',    color:YL },  // blocked by id3 (col4 row0<2)
+      { id:20, row:4, col:4, dir:'up',    color:MG },  // blocked by id19
+      { id:21, row:6, col:4, dir:'up',    color:BL },  // blocked by id20
+      // Chain F — col-6 down, unlocked by id13 (8,6)←
+      { id:22, row:7, col:6, dir:'down',  color:OR },  // blocked by id13 (col6 row8>7)
+      { id:23, row:5, col:6, dir:'down',  color:WH },  // blocked by id22
+      { id:24, row:3, col:6, dir:'down',  color:CY },  // blocked by id23
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 34  "Nexus"  9×9  24 arrows
+  // Opposite-direction perimeter sweeps; two interior col chains unlock in
+  // cross order.  STARTs: (0,0)←  (8,8)→
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 34, name: 'Nexus', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      // Chain A — row-0 left sweep
+      { id:1,  row:0, col:0, dir:'left',  color:CY },  // START (col<0 impossible)
+      { id:2,  row:0, col:2, dir:'left',  color:GR },  // blocked by id1 (row0 col0<2)
+      { id:3,  row:0, col:4, dir:'left',  color:YL },  // blocked by id2 → unlocks id19
+      { id:4,  row:0, col:6, dir:'left',  color:MG },  // blocked by id3
+      { id:5,  row:0, col:8, dir:'left',  color:BL },  // blocked by id4 → unlocks id6
+      // Chain B — col-8 up, unlocked by id5
+      { id:6,  row:1, col:8, dir:'up',    color:PU },  // blocked by id5 (col8 row0<1)
+      { id:7,  row:3, col:8, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:5, col:8, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:8, dir:'up',    color:CY },  // blocked by id8
+      // Chain C — row-8 right sweep (independent START)
+      { id:10, row:8, col:8, dir:'right', color:GR },  // START (col>8 impossible)
+      { id:11, row:8, col:6, dir:'right', color:YL },  // blocked by id10 (row8 col8>6)
+      { id:12, row:8, col:4, dir:'right', color:MG },  // blocked by id11
+      { id:13, row:8, col:2, dir:'right', color:BL },  // blocked by id12 → unlocks id22
+      { id:14, row:8, col:0, dir:'right', color:PU },  // blocked by id13 → unlocks id15
+      // Chain D — col-0 down, unlocked by id14
+      { id:15, row:7, col:0, dir:'down',  color:OR },  // blocked by id14 (col0 row8>7)
+      { id:16, row:5, col:0, dir:'down',  color:WH },  // blocked by id15
+      { id:17, row:3, col:0, dir:'down',  color:CY },  // blocked by id16
+      { id:18, row:1, col:0, dir:'down',  color:GR },  // blocked by id17
+      // Chain E — col-4 up, unlocked by id3 (0,4)←
+      { id:19, row:2, col:4, dir:'up',    color:YL },  // blocked by id3 (col4 row0<2)
+      { id:20, row:4, col:4, dir:'up',    color:MG },  // blocked by id19
+      { id:21, row:6, col:4, dir:'up',    color:BL },  // blocked by id20
+      // Chain F — col-2 down, unlocked by id13 (8,2)→
+      { id:22, row:7, col:2, dir:'down',  color:OR },  // blocked by id13 (col2 row8>7)
+      { id:23, row:5, col:2, dir:'down',  color:WH },  // blocked by id22
+      { id:24, row:3, col:2, dir:'down',  color:CY },  // blocked by id23
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 35  "Last Stand"  9×9  25 arrows
+  // Longest forced chain: A→B→C→D (17 arrows) with two deep interior forks.
+  // Single START at (0,8)→; everything else cascades in strict order.
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 35, name: 'Last Stand', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      // Chain A — row-0 right sweep
+      { id:1,  row:0, col:8, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:6, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:4, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:2, dir:'right', color:MG },  // blocked by id3 → unlocks id18
+      { id:5,  row:0, col:0, dir:'right', color:BL },  // blocked by id4 → unlocks id6
+      // Chain B — col-0 up, unlocked by id5
+      { id:6,  row:2, col:0, dir:'up',    color:PU },  // blocked by id5 (col0 row0<2)
+      { id:7,  row:4, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:6, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:8, col:0, dir:'up',    color:CY },  // blocked by id8 → unlocks id10
+      // Chain C — row-8 left sweep, unlocked by id9
+      { id:10, row:8, col:2, dir:'left',  color:GR },  // blocked by id9 (row8 col0<2)
+      { id:11, row:8, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:8, col:6, dir:'left',  color:MG },  // blocked by id11 → unlocks id25
+      { id:13, row:8, col:8, dir:'left',  color:BL },  // blocked by id12 → unlocks id21
+      // Chain D — col-8 down, unlocked by id13
+      { id:14, row:7, col:8, dir:'down',  color:PU },  // blocked by id13 (col8 row8>7)
+      { id:15, row:5, col:8, dir:'down',  color:OR },  // blocked by id14
+      { id:16, row:3, col:8, dir:'down',  color:WH },  // blocked by id15
+      { id:17, row:1, col:8, dir:'down',  color:CY },  // blocked by id16
+      // Chain E — col-2 up, unlocked by id4 (0,2)→
+      { id:18, row:2, col:2, dir:'up',    color:GR },  // blocked by id4 (col2 row0<2)
+      { id:19, row:4, col:2, dir:'up',    color:YL },  // blocked by id18
+      { id:20, row:6, col:2, dir:'up',    color:MG },  // blocked by id19
+      // Chain F — col-4 down, unlocked by id13 (8,8)← via (8,4) presence
+      // (8,4)← = id11 blocks (6,4)↓ at col4 row8>6 ✓
+      { id:21, row:6, col:4, dir:'down',  color:BL },  // blocked by id11 (col4 row8>6)
+      { id:22, row:4, col:4, dir:'down',  color:PU },  // blocked by id21
+      { id:23, row:2, col:4, dir:'down',  color:OR },  // blocked by id22
+      // id24: row-4 leftward, last lock is id22 (4,4)↓ at col4 < 8
+      { id:24, row:4, col:8, dir:'left',  color:WH },  // blocked by id22 (row4 col4<8)
+      // id25: col-6 down, unlocked by id12 (8,6)←
+      { id:25, row:2, col:6, dir:'down',  color:CY },  // blocked by id12 (col6 row8>2)
+    ],
+  },
 ];
