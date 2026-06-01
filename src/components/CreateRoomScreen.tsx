@@ -167,7 +167,7 @@ export default function CreateRoomScreen({ onBack, onCreated }: Props) {
       </button>
 
       <div className="room-form-brand">
-        <span className="room-form-icon">🏠</span>
+        <span className="room-form-icon">⊞</span>
         <h2 className="room-form-title">Create a Room</h2>
         <p className="room-form-sub">Invite friends with the room code</p>
       </div>

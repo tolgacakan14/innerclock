@@ -67,8 +67,10 @@ export default function GrandmaResultsScreen({ rounds, playerName, onPlayAgain, 
       <div className="grandma-rounds-list">
         {rounds.map((r, i) => (
           <div key={i} className="grandma-rounds-row">
-            <span className="grandma-rounds-index">{i + 1}</span>
-            <span className="grandma-rounds-name">{r.patternName}</span>
+            <span className="grandma-rounds-index">Round {i + 1}</span>
+            <span className="grandma-rounds-name">
+              {r.diedAtLevelName ? `Died in ${r.diedAtLevelName}` : '—'}
+            </span>
             <span className="grandma-rounds-score">{r.score} s</span>
           </div>
         ))}

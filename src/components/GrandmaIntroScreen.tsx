@@ -47,18 +47,29 @@ export default function GrandmaIntroScreen({ onStart, onBack, onHotMode }: Props
         <div className="grandma-intro-rule">
           <span className="grandma-intro-rule-icon">↑</span>
           <span>
-            <strong>Jump</strong> — tap the left side of the screen (or Space / ↑ on desktop)
+            <strong>Jump</strong> — tap anywhere (or Space / ↑ on desktop)
           </span>
         </div>
         <div className="grandma-intro-rule">
           <span className="grandma-intro-rule-icon">↓</span>
           <span>
-            <strong>Crouch</strong> — tap the right side (or ↓ / S on desktop)
+            <strong>Crouch</strong> — hold anywhere · release to stand (or ↓ / S on desktop)
           </span>
         </div>
         <div className="grandma-intro-rule">
           <span className="grandma-intro-rule-icon">⏱</span>
           <span>5 rounds · speed increases over time · total score = sum of all rounds</span>
+        </div>
+      </div>
+
+      <div className="grandma-intro-speeds">
+        <p className="grandma-intro-speeds-label">Speed levels</p>
+        <div className="grandma-intro-speed-pills">
+          {['Beginner', 'Adapte', 'Normal', 'Back to 20s', 'Menopause', 'Last Dance', 'Virgin Mode'].map((name, i) => (
+            <span key={name} className="grandma-intro-speed-pill" style={{ opacity: 0.45 + i * 0.08 }}>
+              {name}
+            </span>
+          ))}
         </div>
       </div>
 

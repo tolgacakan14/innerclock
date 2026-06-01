@@ -162,6 +162,34 @@ interface Props {
   onHome:      () => void;
 }
 
+// ── Golf swing sound ──────────────────────────────────────────────────────────
+function playGolfSwing(power: number) {
+  try {
+    const ctx = new (window.AudioContext ?? (window as any).webkitAudioContext)();
+    // Whoosh: noise burst filtered to a swish
+    const bufLen = Math.floor(ctx.sampleRate * 0.18);
+    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+    }
+    const src    = ctx.createBufferSource();
+    src.buffer   = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type  = 'bandpass';
+    filter.frequency.value = 900 + power * 800;
+    filter.Q.value = 1.4;
+    const gain   = ctx.createGain();
+    gain.gain.setValueAtTime(0.35 + power * 0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    src.start();
+    src.onended = () => ctx.close();
+  } catch { /* silent */ }
+}
+
 export default function GolfGameScreen({ course, courseIndex, onComplete, onHome }: Props) {
   const svgRef    = useRef<SVGSVGElement>(null);
   const svgRectRef = useRef<DOMRect | null>(null);
@@ -360,6 +388,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     const speed = power * MAX_SPEED;
     prevBallPosRef.current = { x: b.x, y: b.y };
     ballRef.current = { ...b, vx: (-dx / dist) * speed, vy: (-dy / dist) * speed };
+    playGolfSwing(power);
 
     const newShots = shotsRef.current + 1;
     shotsRef.current = newShots;

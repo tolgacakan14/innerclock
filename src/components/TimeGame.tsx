@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import StartScreen       from './StartScreen';
 import CountdownScreen   from './CountdownScreen';
 import ObserveScreen     from './ObserveScreen';
 import ReproduceScreen   from './ReproduceScreen';
 import FeedbackScreen    from './FeedbackScreen';
 import TimeResultsScreen from './TimeResultsScreen';
-import { calcScore, randomTarget } from '../utils';
+import { calcScore, randomTarget, makeGameRng } from '../utils';
 import type { Round, RoomContext } from '../types';
+import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 
 type TimeScreen = 'start' | 'countdown' | 'observe' | 'reproduce' | 'feedback' | 'results';
 
@@ -17,15 +18,24 @@ interface Props {
 }
 
 export default function TimeGame({ playerName, onExit, roomContext }: Props) {
+  const { setTrack } = useBackgroundMusic();
+  useEffect(() => { setTrack('time'); }, []);
+
   const [screen,        setScreen]        = useState<TimeScreen>('start');
   const [targets,       setTargets]       = useState<number[]>([]);
   const [rounds,        setRounds]        = useState<Round[]>([]);
   const [currentRound,  setCurrentRound]  = useState(0);
   const [pendingActual, setPendingActual] = useState(0);
 
+  function handleExit() {
+    setTrack('main');
+    onExit();
+  }
+
   // ── Start: generate 5 hidden target durations ──────────────────────────────
   function handleStart() {
-    setTargets(Array.from({ length: 5 }, randomTarget));
+    const rng = makeGameRng(roomContext, 'time');
+    setTargets(Array.from({ length: 5 }, () => randomTarget(rng)));
     setRounds([]);
     setCurrentRound(0);
     setScreen('countdown');
@@ -62,7 +72,7 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
   return (
     <>
       {screen === 'start' && (
-        <StartScreen onStart={handleStart} onBack={onExit} />
+        <StartScreen onStart={handleStart} onBack={handleExit} />
       )}
       {screen === 'countdown' && (
         <CountdownScreen
@@ -70,7 +80,7 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
           roundIndex={currentRound}
           totalRounds={5}
           onDone={handleCountdownDone}
-          onHome={onExit}
+          onHome={handleExit}
         />
       )}
       {screen === 'observe' && (
@@ -80,7 +90,7 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
           roundIndex={currentRound}
           totalRounds={5}
           onDone={handleObserveDone}
-          onHome={onExit}
+          onHome={handleExit}
         />
       )}
       {screen === 'reproduce' && (
@@ -89,7 +99,7 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
           roundIndex={currentRound}
           totalRounds={5}
           onComplete={handleReproduce}
-          onHome={onExit}
+          onHome={handleExit}
         />
       )}
       {screen === 'feedback' && (
@@ -99,7 +109,7 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
           roundIndex={currentRound}
           totalRounds={5}
           onNext={handleNextRound}
-          onHome={onExit}
+          onHome={handleExit}
         />
       )}
       {screen === 'results' && (
@@ -107,7 +117,7 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
           rounds={rounds}
           playerName={playerName}
           onPlayAgain={handleStart}
-          onExit={onExit}
+          onExit={handleExit}
           roomContext={roomContext}
         />
       )}

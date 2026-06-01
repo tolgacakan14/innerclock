@@ -29,7 +29,7 @@ interface PlayerResult {
   roundPts:   Record<number, number>;   // round_number → pts
 }
 
-const RANK_MEDAL = ['🥇', '🥈', '🥉'];
+const RANK_MEDAL = ['1st', '2nd', '3rd'];
 
 function getRankMedal(rank: number): string {
   return RANK_MEDAL[rank - 1] ?? `#${rank}`;
@@ -120,7 +120,7 @@ export default function RoomFinalScreen({ roomCtx: propCtx, onBackToLobby }: Pro
   // ── Copy results text ──────────────────────────────────────────────────────
   function handleCopyResults() {
     const lines: string[] = [
-      `🏆 ${room?.room_name ?? ctx?.roomName ?? 'Party Game'} — Final Results`,
+      `${room?.room_name ?? ctx?.roomName ?? 'Party Game'} — Final Results`,
       '',
       ...results.map((r, i) =>
         `${getRankMedal(i + 1)} ${r.playerName} — ${r.totalPts} pts`,
@@ -167,7 +167,7 @@ export default function RoomFinalScreen({ roomCtx: propCtx, onBackToLobby }: Pro
     <div className="screen final-screen">
       {/* Header */}
       <div className="final-header">
-        <span className="final-trophy">🏆</span>
+        <span className="final-trophy">★</span>
         <h2 className="final-title">Final Results</h2>
         <p className="final-sub">{roomName} · {code}</p>
       </div>

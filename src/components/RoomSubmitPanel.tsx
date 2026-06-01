@@ -50,7 +50,7 @@ export default function RoomSubmitPanel({
   return (
     <div className="room-submit-panel">
       <div className="room-submit-panel-header">
-        <span className="room-submit-icon">🏆</span>
+        <span className="room-submit-icon">★</span>
         <span className="room-submit-room-name">{roomContext.roomName}</span>
         <span className="room-submit-code">#{roomContext.roomCode}</span>
       </div>

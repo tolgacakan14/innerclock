@@ -5,6 +5,7 @@ interface Props {
   completedLevels:   number;
   maxSequenceLength: number;
   score:             number;
+  elapsedTime?:      number;   // seconds — how long the session lasted
   playerName:        string;
   onPlayAgain:       () => void;
   onExit:            () => void;
@@ -20,7 +21,7 @@ function getMessage(levels: number): string {
 }
 
 export default function SequenceTapResultScreen({
-  completedLevels, maxSequenceLength, playerName, onPlayAgain, onExit, roomContext,
+  completedLevels, maxSequenceLength, elapsedTime, playerName, onPlayAgain, onExit, roomContext,
 }: Props) {
   const message = getMessage(completedLevels);
 
@@ -46,6 +47,12 @@ export default function SequenceTapResultScreen({
           <span>Longest sequence</span>
           <span>{maxSequenceLength} taps</span>
         </div>
+        {elapsedTime !== undefined && (
+          <div className="feedback-row">
+            <span>Time played</span>
+            <span>{elapsedTime}s</span>
+          </div>
+        )}
       </div>
 
       <div className="actions">

@@ -352,6 +352,15 @@ body {
   46%  { transform: translateY(-7px); }
   100% { transform: translateY(0px); }
 }
+.home-tagline-perception {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.75;
+  margin-bottom: 2px;
+}
 .home-tagline { font-size: 0.9rem; color: var(--muted); letter-spacing: 0.01em; }
 .home-tagline-sub {
   font-size: 0.72rem;
@@ -447,6 +456,11 @@ body {
   .home-card:hover .home-card-svg {
     transform: scale(1.07) translateY(-3px);
   }
+  /* Premium card hover glow uses accent color */
+  .home-card--arrowescape:hover { box-shadow: 0 16px 48px rgba(0,0,0,0.62), 0 0 0 1px rgba(90,160,255,0.28); }
+  .home-card--sequence:hover    { box-shadow: 0 16px 48px rgba(0,0,0,0.62), 0 0 0 1px rgba(255,159,10,0.28); }
+  .home-card--memory:hover      { box-shadow: 0 16px 48px rgba(0,0,0,0.62), 0 0 0 1px rgba(90,200,245,0.28); }
+  .home-card--timing:hover      { box-shadow: 0 16px 48px rgba(0,0,0,0.62), 0 0 0 1px rgba(48,209,88,0.28);  }
   /* Button hover states (kept here for all screens) */
   .btn-primary:hover:not(:disabled) {
     background: rgba(255,255,255,1);
@@ -470,10 +484,45 @@ body {
 .home-card--rush      { background: linear-gradient(140deg, #1f0c0c 0%, #0c0707 100%); }
 .home-card--golf      { background: linear-gradient(140deg, #071a0d 0%, #050b07 100%); }
 .home-card--grandma   { background: linear-gradient(140deg, #120c1e 0%, #08060d 100%); }
-.home-card--arrowescape { background: linear-gradient(140deg, #060c1e 0%, #04060d 100%); }
-.home-card--sequence  { background: linear-gradient(140deg, #1a1208 0%, #0a0905 100%); }
-.home-card--memory    { background: linear-gradient(140deg, #061218 0%, #040810 100%); }
-.home-card--timing    { background: linear-gradient(140deg, #071a0d 0%, #050c06 100%); }
+.home-card--arrowescape {
+  background: linear-gradient(145deg, #0c1836 0%, #050c1a 60%, #030810 100%);
+  border-color: rgba(90,160,255,0.18);
+}
+.home-card--sequence {
+  background: linear-gradient(145deg, #221806 0%, #120e04 60%, #080602 100%);
+  border-color: rgba(255,159,10,0.18);
+}
+.home-card--memory {
+  background: linear-gradient(145deg, #071c2e 0%, #040e1c 60%, #030810 100%);
+  border-color: rgba(90,200,245,0.18);
+}
+.home-card--timing {
+  background: linear-gradient(145deg, #071d0c 0%, #041008 60%, #030806 100%);
+  border-color: rgba(48,209,88,0.18);
+}
+
+/* Premium glass shine — top-left sweep */
+.home-card--arrowescape::after,
+.home-card--sequence::after,
+.home-card--memory::after,
+.home-card--timing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    125deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.02) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.home-card--arrowescape:active::after,
+.home-card--sequence:active::after,
+.home-card--memory:active::after,
+.home-card--timing:active::after { opacity: 0; }
 
 /* ── Card graphic area ───────────────────────────────────────── */
 .home-card-graphic {
@@ -2464,6 +2513,37 @@ body {
   padding-top: 1px;
 }
 
+/* ── Speed level pills ────────────────────────────────────────────────────── */
+.grandma-intro-speeds {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.grandma-intro-speeds-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 8px 2px;
+  opacity: 0.7;
+}
+
+.grandma-intro-speed-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.grandma-intro-speed-pill {
+  font-size: 0.74rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: rgba(198, 182, 212, 0.85);
+  white-space: nowrap;
+}
+
 /* ── Game wrap ────────────────────────────────────────────────────────────── */
 .grandma-game-wrap {
   position: fixed;
@@ -2539,29 +2619,7 @@ body {
 }
 
 /* ── Touch zone hints ─────────────────────────────────────────────────────── */
-.grandma-touch-zones {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  pointer-events: none;
-}
-
-.grandma-touch-zone {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 14px));
-  font-size: 0.60rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.18;
-  color: rgba(255,255,255,0.90);
-}
-
-.grandma-touch-zone--jump   { border-right: 1px solid rgba(255,255,255,0.06); }
-.grandma-touch-zone--crouch { }
+/* .grandma-touch-zones removed — replaced with one-hand pointer controls */
 
 /* ── Countdown overlay ───────────────────────────────────────────────────── */
 .grandma-countdown-overlay {
@@ -2615,6 +2673,31 @@ body {
   color: var(--text);
   text-align: center;
   margin: 0;
+}
+
+/* Task 3 — Game title + died-at-level display */
+.grandma-game-title-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  text-align: center;
+  margin: 0;
+  opacity: 0.85;
+}
+
+.grandma-died-at-level {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+}
+
+.grandma-died-level-name {
+  font-weight: 800;
+  color: var(--text);
 }
 
 .grandma-round-score-block {
@@ -5158,6 +5241,7 @@ body {
    Home screen — new mode card accent colors
 ═══════════════════════════════════════════════════════════════ */
 
+.home-card--arrowescape { --card-accent: rgba(90,160,255,0.65); }
 .home-card--sequence  { --card-accent: rgba(255,159,10,0.65); }
 .home-card--memory    { --card-accent: rgba(90,200,245,0.65); }
 .home-card--timing    { --card-accent: rgba(48,209,88,0.65);  }
@@ -5192,14 +5276,23 @@ body {
   letter-spacing: -0.3px;
   color: rgba(255,255,255,0.92);
 }
-.seq-completed-count {
-  font-size: 16px;
-  font-weight: 700;
+.seq-done-inline {
+  font-size: 13px;
+  font-weight: 600;
   color: #30D158;
-  text-shadow: 0 0 10px rgba(48,209,88,0.50);
-  min-width: 44px;
-  text-align: right;
+  opacity: 0.80;
 }
+.seq-game-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.30);
+  text-transform: uppercase;
+  text-align: right;
+  min-width: 44px;
+}
+/* keep old class in case anything references it */
+.seq-completed-count { display: none; }
 
 .seq-status-row {
   min-height: 46px;
@@ -5402,14 +5495,23 @@ body {
   letter-spacing: -0.3px;
   color: rgba(255,255,255,0.92);
 }
-.mg-completed-count {
-  font-size: 16px;
-  font-weight: 700;
+.mg-done-inline {
+  font-size: 13px;
+  font-weight: 600;
   color: #30D158;
-  text-shadow: 0 0 10px rgba(48,209,88,0.50);
-  min-width: 44px;
-  text-align: right;
+  opacity: 0.80;
 }
+.mg-game-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.30);
+  text-transform: uppercase;
+  text-align: right;
+  min-width: 44px;
+}
+/* keep old class in case anything references it */
+.mg-completed-count { display: none; }
 
 .mg-status-row {
   min-height: 46px;
@@ -5466,9 +5568,11 @@ body {
   gap: clamp(3px, 1.3vw, 8px);
   flex: none;
   margin: auto;
-  padding: 0;
+  padding: 2px;
   box-sizing: border-box;
   overflow: hidden;
+  border-radius: 12px;
+  isolation: isolate;
 }
 
 .mg-cell {
@@ -5489,9 +5593,9 @@ body {
   background: rgba(90,200,245,0.72);
   border-color: rgba(90,200,245,0.90);
   box-shadow:
-    0 0 0 1px rgba(90,200,245,0.55),
-    0 0 20px rgba(90,200,245,0.50);
-  transform: scale(1.04);
+    inset 0 0 0 1.5px rgba(90,200,245,0.80),
+    0 0 10px rgba(90,200,245,0.35);
+  transform: scale(1.02);
 }
 .mg-cell--selected {
   background: rgba(255,214,10,0.52);
@@ -5610,14 +5714,20 @@ body {
   letter-spacing: -0.5px;
 }
 
+/* Fixed-height slot so the bar doesn't shift when combo appears/disappears */
+.tt-combo-slot {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .tt-combo {
   font-size: 21px;
   font-weight: 800;
   color: #FFD60A;
   text-shadow: 0 0 16px rgba(255,214,10,0.65);
   letter-spacing: 0.5px;
-  flex-shrink: 0;
-  padding: 2px 0 0;
   animation: ttComboPop 0.22s cubic-bezier(0.34,1.56,0.64,1);
 }
 @keyframes ttComboPop {

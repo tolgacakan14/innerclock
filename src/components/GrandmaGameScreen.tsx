@@ -1168,8 +1168,8 @@ function CountdownOverlay({ count }: { count: number }) {
 
 interface Props {
   pattern:    GrandmaPattern;
-  roundIndex: number;   // 0–4
-  onComplete: (score: number) => void;
+  roundIndex: number;   // 0–2
+  onComplete: (score: number, diedAtLevelName: string) => void;
   onHome:     () => void;
 }
 
@@ -1221,6 +1221,12 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   const jumpPressRef  = useRef(false);
   const crouchHeldRef = useRef(false);
 
+  // ── One-hand tap / hold refs ────────────────────────────────────────────────
+  // Quick tap (< HOLD_THRESHOLD ms) → jump.  Long press → crouch (held until release).
+  const HOLD_THRESHOLD = 110; // ms
+  const holdTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdActiveRef  = useRef(false);
+
   // React state for display
   const [displayScore,    setDisplayScore]    = useState(0);
   const [countdown,       setCountdown]       = useState(3);
@@ -1228,6 +1234,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   const [levelBanner,     setLevelBanner]     = useState<LevelName | null>(null);
   const [virginMode,      setVirginMode]      = useState(false);
   const [lastDanceActive, setLastDanceActive] = useState(false);
+  const [menopauseActive, setMenopauseActive] = useState(false);
   const [tickets,         setTickets]         = useState<GrandmaTicket[]>([]);
   const bannerTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ticketIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1253,54 +1260,82 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     };
   }, []);
 
-  // ── Falling KRONE tickets — Last Dance (level 5+) ───────────────────────────
+  // ── Falling KRONE tickets ─────────────────────────────────────────────────
+  // Tier 0: Menopause (level 4+) — only on round 2 (third round), 1 ticket / 3s
   useEffect(() => {
-    if (!lastDanceActive) return;
+    if (!menopauseActive || virginMode || lastDanceActive) return;
     function spawnTickets(count: number) {
+      if (!gsRef.current.alive) return;
+      setTickets(prev => {
+        const kept = prev.slice(-10);
+        const batch: GrandmaTicket[] = Array.from({ length: count }, () => ({
+          id: performance.now() + Math.random(), left: 4 + Math.random() * 88,
+          delay: Math.random() * 400, duration: 2400 + Math.random() * 600,
+          rotate: (Math.random() - 0.5) * 35,
+        }));
+        return [...kept, ...batch];
+      });
+    }
+    spawnTickets(1);
+    ticketIntervalRef.current = setInterval(() => {
+      if (!gsRef.current.alive) { clearInterval(ticketIntervalRef.current!); return; }
+      spawnTickets(1);
+    }, 3000);
+    return () => { clearInterval(ticketIntervalRef.current!); ticketIntervalRef.current = null; };
+  }, [menopauseActive, lastDanceActive, virginMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tier 1: Last Dance (level 5+) — starts at round 1+; sparse on round 0
+  useEffect(() => {
+    if (!lastDanceActive || virginMode) return;
+    clearInterval(ticketIntervalRef.current!);
+    // Round 0 = very sparse (2 every 2s), round 1 = moderate (3 every 1s), round 2 = heavier (4 every 750ms)
+    const count    = roundIndex === 0 ? 2 : roundIndex === 1 ? 3 : 4;
+    const interval = roundIndex === 0 ? 2000 : roundIndex === 1 ? 1000 : 750;
+    function spawnTickets(n: number) {
       if (!gsRef.current.alive) return;
       setTickets(prev => {
         const kept = prev.slice(-20);
-        const batch: GrandmaTicket[] = Array.from({ length: count }, () => ({
-          id:       performance.now() + Math.random(),
-          left:     4 + Math.random() * 88,
-          delay:    Math.random() * 250,
-          duration: 1900 + Math.random() * 900,
-          rotate:   (Math.random() - 0.5) * 44,
+        const batch: GrandmaTicket[] = Array.from({ length: n }, () => ({
+          id: performance.now() + Math.random(), left: 4 + Math.random() * 88,
+          delay: Math.random() * 250, duration: 1900 + Math.random() * 900,
+          rotate: (Math.random() - 0.5) * 44,
         }));
         return [...kept, ...batch];
       });
     }
-    spawnTickets(4); // initial burst
+    spawnTickets(count);
     ticketIntervalRef.current = setInterval(() => {
       if (!gsRef.current.alive) { clearInterval(ticketIntervalRef.current!); return; }
-      spawnTickets(2);
-    }, 750);
+      spawnTickets(count);
+    }, interval);
     return () => { clearInterval(ticketIntervalRef.current!); ticketIntervalRef.current = null; };
-  }, [lastDanceActive]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lastDanceActive, virginMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Falling KRONE tickets — Virgin Mode (level 6+): denser shower ───────────
+  // Tier 2: Virgin Mode (level 6+) — dense shower, scales with round
   useEffect(() => {
     if (!virginMode) return;
     clearInterval(ticketIntervalRef.current!);
-    function spawnTickets(count: number) {
+    // Round 0 = few (3 initial, 2 every 1200ms), round 1 = more, round 2 = dense
+    const initCount = roundIndex === 0 ? 3 : roundIndex === 1 ? 5 : 7;
+    const loopCount = roundIndex === 0 ? 2 : roundIndex === 1 ? 2 : 3;
+    const loopMs    = roundIndex === 0 ? 1200 : roundIndex === 1 ? 700 : 420;
+    function spawnTickets(n: number) {
       if (!gsRef.current.alive) return;
       setTickets(prev => {
         const kept = prev.slice(-30);
-        const batch: GrandmaTicket[] = Array.from({ length: count }, () => ({
-          id:       performance.now() + Math.random(),
-          left:     4 + Math.random() * 88,
-          delay:    Math.random() * 100,
-          duration: 1400 + Math.random() * 600,
-          rotate:   (Math.random() - 0.5) * 65,
+        const batch: GrandmaTicket[] = Array.from({ length: n }, () => ({
+          id: performance.now() + Math.random(), left: 4 + Math.random() * 88,
+          delay: Math.random() * 100, duration: 1400 + Math.random() * 600,
+          rotate: (Math.random() - 0.5) * 65,
         }));
         return [...kept, ...batch];
       });
     }
-    spawnTickets(7); // bigger burst for Virgin Mode
+    spawnTickets(initCount);
     ticketIntervalRef.current = setInterval(() => {
       if (!gsRef.current.alive) { clearInterval(ticketIntervalRef.current!); return; }
-      spawnTickets(3);
-    }, 420);
+      spawnTickets(loopCount);
+    }, loopMs);
     return () => { clearInterval(ticketIntervalRef.current!); ticketIntervalRef.current = null; };
   }, [virginMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1416,7 +1451,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         if (gs.deathTimer >= DEATH_MS) {
           gs.dying = false;
           const finalScore = Math.floor(gs.elapsed);
-          setTimeout(() => onCompleteRef.current(finalScore), 50);
+          setTimeout(() => onCompleteRef.current(finalScore, SPEED_LEVELS[gs.currentLevel].name), 50);
           cancelAnimationFrame(animId);
           return;
         }
@@ -1452,6 +1487,8 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
         const bannerDur = newLevel >= 5 ? 2400 : 1900;
         bannerTimerRef.current = setTimeout(() => setLevelBanner(null), bannerDur);
+        // Tickets tier — earlier rounds unlock later tiers later
+        if (newLevel >= 4 && roundIndex >= 2) setMenopauseActive(true);
         if (newLevel >= 5) setLastDanceActive(true);
         if (newLevel >= 6) setVirginMode(true);
       }
@@ -1647,47 +1684,55 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     };
   }, []);
 
-  // ── Touch zones ───────────────────────────────────────────────────────────
-  // Portrait: game rotated -90°, so bottom half of screen → JUMP, top half → CROUCH
-  // Landscape: left half → JUMP, right half → CROUCH
-  function handleTouchStart(e: React.TouchEvent) {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (isPortrait) {
-        if (t.clientY >= window.innerHeight / 2) {
-          jumpPressRef.current = true;
-        } else {
-          crouchHeldRef.current = true;
-        }
-      } else {
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        if (t.clientX - rect.left < rect.width / 2) {
-          jumpPressRef.current = true;
-        } else {
-          crouchHeldRef.current = true;
-        }
-      }
+  // ── One-hand pointer controls ─────────────────────────────────────────────
+  // Quick tap (< HOLD_THRESHOLD) = jump.  Long press (≥ HOLD_THRESHOLD) = crouch.
+  // No left/right or top/bottom zones — tap anywhere.
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Ignore clicks on the Home button (propagation for buttons is stopped separately)
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    try { (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); } catch (_) { /* noop */ }
+    holdActiveRef.current = false;
+    holdTimerRef.current = setTimeout(() => {
+      holdActiveRef.current = true;
+      crouchHeldRef.current = true;
+      jumpPressRef.current  = false;
+    }, HOLD_THRESHOLD);
+  }
+  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdActiveRef.current) {
+      // End crouch
+      crouchHeldRef.current = false;
+      holdActiveRef.current = false;
+    } else {
+      // Quick tap → jump
+      jumpPressRef.current  = true;
+      crouchHeldRef.current = false;
     }
   }
-  function handleTouchEnd(e: React.TouchEvent) {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (isPortrait) {
-        if (t.clientY < window.innerHeight / 2) crouchHeldRef.current = false;
-      } else {
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        if (t.clientX - rect.left >= rect.width / 2) crouchHeldRef.current = false;
-      }
+  function handlePointerCancel() {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
     }
+    crouchHeldRef.current = false;
+    holdActiveRef.current = false;
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
       className={`grandma-game-wrap${isHot ? ' grandma-game-wrap--hot' : ''}`}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      style={{ touchAction: 'none', userSelect: 'none' } as React.CSSProperties}
     >
       {/* Header */}
       <div className="grandma-game-header">
@@ -1743,11 +1788,6 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
               </span>
             </div>
           )}
-
-          <div className="grandma-touch-zones" aria-hidden="true">
-            <div className="grandma-touch-zone grandma-touch-zone--jump">JUMP</div>
-            <div className="grandma-touch-zone grandma-touch-zone--crouch">DUCK</div>
-          </div>
 
           {/* Falling KRONE tickets — Last Dance & Virgin Mode */}
           {tickets.map(tk => (

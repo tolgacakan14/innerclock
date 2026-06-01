@@ -31,15 +31,15 @@ import {
 // ── Mode definitions ──────────────────────────────────────────────────────────
 
 const ALL_MODES: { id: GameMode; icon: string; label: string; sub: string }[] = [
-  { id: 'rush',        icon: '⚡', label: 'Rush',          sub: 'Tap reaction'    },
-  { id: 'color',       icon: '🎨', label: 'Colour',        sub: 'Colour memory'   },
-  { id: 'golf',        icon: '⛳', label: 'Golf',           sub: 'Precision shot'  },
-  { id: 'grandma',     icon: '👵', label: 'Grandma',        sub: 'Survival run'    },
-  { id: 'arrowEscape', icon: '🏹', label: 'Arrow Escape',   sub: 'Logic puzzle'    },
-  { id: 'time',        icon: '⏱', label: 'Time',           sub: 'Internal clock'  },
-  { id: 'sequence',    icon: '🔢', label: 'Sequence Tap',   sub: 'Pattern memory'  },
-  { id: 'memory',      icon: '🧠', label: 'Memory Grid',    sub: 'Cell recall'     },
-  { id: 'timing',      icon: '🎯', label: 'Tap Timing',     sub: 'Precision tap'   },
+  { id: 'rush',        icon: '▷',  label: 'Rush',          sub: 'Tap reaction'    },
+  { id: 'color',       icon: '◉',  label: 'Colour',        sub: 'Colour memory'   },
+  { id: 'golf',        icon: '◈',  label: 'Golf',          sub: 'Precision shot'  },
+  { id: 'grandma',     icon: '♟',  label: 'Grandma',       sub: 'Survival run'    },
+  { id: 'arrowEscape', icon: '↗',  label: 'Arrow Escape',  sub: 'Logic puzzle'    },
+  { id: 'time',        icon: '◷',  label: 'Time',          sub: 'Internal clock'  },
+  { id: 'sequence',    icon: '▣',  label: 'Sequence Tap',  sub: 'Pattern memory'  },
+  { id: 'memory',      icon: '▦',  label: 'Memory Grid',   sub: 'Cell recall'     },
+  { id: 'timing',      icon: '◆',  label: 'Tap Timing',    sub: 'Precision tap'   },
 ];
 
 function fmtTime(iso: string): string {
@@ -47,9 +47,9 @@ function fmtTime(iso: string): string {
 }
 
 function rankBadge(i: number) {
-  if (i === 0) return '🥇';
-  if (i === 1) return '🥈';
-  if (i === 2) return '🥉';
+  if (i === 0) return '1st';
+  if (i === 1) return '2nd';
+  if (i === 2) return '3rd';
   return `#${i + 1}`;
 }
 
@@ -528,7 +528,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
   function renderCountdown() {
     const modeLabel = room?.selected_mode
-      ? `${MODE_ICONS[room.selected_mode] ?? '🎮'} ${MODE_LABELS_FULL[room.selected_mode] ?? room.selected_mode}`
+      ? `${MODE_ICONS[room.selected_mode] ?? ''} ${MODE_LABELS_FULL[room.selected_mode] ?? room.selected_mode}`.trim()
       : '';
     return (
       <div className="lobby-cd-overlay">
@@ -567,7 +567,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       <div className="room-players-section">
         <div className="room-section-row">
           <span className="room-section-title">
-            👥 Players
+            Players
             {players.length > 0 && <span className="room-count-chip">{players.length}</span>}
           </span>
           <button className="room-refresh-btn" onClick={fetchAll} disabled={busy} aria-label="Refresh">↻</button>
@@ -596,7 +596,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
   /** Challenge leaderboard for the active selected_mode */
   function renderChallengeLeaderboard() {
     if (!selectedMode) return null;
-    const icon  = MODE_ICONS[selectedMode] ?? '🎮';
+    const icon  = MODE_ICONS[selectedMode] ?? '';
     const label = MODE_LABELS_FULL[selectedMode] ?? selectedMode;
 
     return (
@@ -649,7 +649,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
               onClick={handleCopyLink}
               aria-label="Copy invite link"
             >
-              {copied ? '✓ Copied' : '⎘ Invite'}
+              {copied ? '✓ Copied!' : 'Share! ⎘'}
             </button>
           </div>
           <p className="room-lobby-player">
@@ -671,7 +671,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       {/* ── Waiting / Mode selection ──────────────────────────────────────── */}
       {(gs === 'waiting' || gs === 'mode_selected') && (
         <div className="room-party-section">
-          <span className="room-section-title">🏆 Competitive Challenge</span>
+          <span className="room-section-title">Competitive Challenge</span>
 
           {isHost ? (
             <>
@@ -726,7 +726,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
               {selectedMode ? (
                 <>
                   <div className="lobby-mode-selected-display">
-                    <span className="lobby-mode-selected-icon">{MODE_ICONS[selectedMode] ?? '🎮'}</span>
+                    <span className="lobby-mode-selected-icon">{MODE_ICONS[selectedMode] ?? ''}</span>
                     <div>
                       <p className="lobby-mode-selected-label">Host selected</p>
                       <p className="lobby-mode-selected-name">{MODE_LABELS_FULL[selectedMode]}</p>
@@ -753,7 +753,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       {shouldShowPlay && (
         <div className="room-party-section">
           <span className="room-section-title">
-            🏆 Challenge Active — {MODE_ICONS[selectedMode!]} {MODE_LABELS_FULL[selectedMode!]}
+            Challenge Active — {MODE_ICONS[selectedMode!]} {MODE_LABELS_FULL[selectedMode!]}
           </span>
 
           <div className="lobby-challenge-active-panel">
@@ -804,14 +804,14 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
               <p className="room-party-hint">
                 Run a guided 5-round game.
                 <br />
-                <span className="room-party-hint-seq">⚡ Rush → 🎨 Colour → ⛳ Golf → 👵 Grandma → 🏹 Arrow</span>
+                <span className="room-party-hint-seq">Rush → Colour → Golf → Grandma → Arrow</span>
               </p>
               <button
                 className="btn-primary room-party-start-btn"
                 onClick={handleStartPartyGame}
                 disabled={busy}
               >
-                {busy ? 'Starting…' : '🎮 Start 5-Round Party'}
+                {busy ? 'Starting…' : 'Start 5-Round Party'}
               </button>
             </div>
           )}
@@ -821,7 +821,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       {/* 5-round active state (legacy) */}
       {gs === 'active' && (
         <div className="room-party-section">
-          <span className="room-section-title">🎮 Party Game — Round Progress</span>
+          <span className="room-section-title">Party Game — Round Progress</span>
 
           {activeRound && (
             <div className="room-active-banner">
@@ -848,7 +848,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
                 <span className="room-round-icon">{MODE_ICONS[r.mode]}</span>
                 <span className="room-round-name">{MODE_LABELS[r.mode]}</span>
                 <span className="room-round-status-icon">
-                  {r.status === 'completed' ? '✓' : r.status === 'active' ? '🔵' : '○'}
+                  {r.status === 'completed' ? '✓' : r.status === 'active' ? '●' : '○'}
                 </span>
                 {isHost && r.status === 'waiting' && canStartRound(r.round_number) && (
                   <button className="room-round-action-btn" onClick={() => handleStartRound(r)} disabled={busy}>Start</button>
@@ -862,7 +862,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
 
           {isHost && allRoundsDone && (
             <button className="btn-primary room-party-start-btn" onClick={handleFinishGame} disabled={busy}>
-              {busy ? 'Finishing…' : '🏆 End Game & See Results'}
+              {busy ? 'Finishing…' : 'End Game & See Results'}
             </button>
           )}
 
@@ -884,7 +884,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
             className="btn-primary room-party-start-btn"
             onClick={() => navigate(`/room/${roomCtx.roomCode}/final`)}
           >
-            🏆 View Final Results
+            View Final Results
           </button>
           {isHost && (
             <button className="lobby-reset-btn" onClick={handleReset} disabled={busy}>

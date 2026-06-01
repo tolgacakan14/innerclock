@@ -18,11 +18,13 @@ export default function SequenceTapGame({ playerName, onExit, roomContext }: Pro
   const [completedLevels, setCompletedLevels] = useState(0);
   const [maxSeqLen,       setMaxSeqLen]       = useState(0);
   const [finalScore,      setFinalScore]      = useState(0);
+  const [elapsedTime,     setElapsedTime]     = useState(0);
 
-  function handleComplete(completed: number, maxSeq: number, score: number) {
+  function handleComplete(completed: number, maxSeq: number, score: number, elapsed: number) {
     setCompletedLevels(completed);
     setMaxSeqLen(maxSeq);
     setFinalScore(score);
+    setElapsedTime(elapsed);
     setScreen('results');
   }
 
@@ -50,6 +52,7 @@ export default function SequenceTapGame({ playerName, onExit, roomContext }: Pro
           completedLevels={completedLevels}
           maxSequenceLength={maxSeqLen}
           score={finalScore}
+          elapsedTime={elapsedTime}
           playerName={playerName}
           onPlayAgain={handlePlayAgain}
           onExit={handleExit}

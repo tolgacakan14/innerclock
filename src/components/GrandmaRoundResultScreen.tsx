@@ -1,27 +1,39 @@
 interface Props {
-  roundIndex:  number;   // 0–4
-  patternName: string;
-  score:       number;   // floor(seconds survived)
-  onNext:      () => void;
-  onHome:      () => void;
+  roundIndex:       number;   // 0–2
+  score:            number;   // floor(seconds survived)
+  diedAtLevelName?: string;   // e.g. 'Last Dance', 'Virgin Mode'
+  onNext:           () => void;
+  onHome:           () => void;
 }
 
-export default function GrandmaRoundResultScreen({ roundIndex, patternName, score, onNext, onHome }: Props) {
+export default function GrandmaRoundResultScreen({ roundIndex, score, diedAtLevelName, onNext, onHome }: Props) {
   const isLast = roundIndex === 2;
 
   return (
     <div className="screen grandma-round-result-screen">
+      <p className="grandma-game-title-label">Grandma Walking</p>
+
       <p className="grandma-round-label-text">Round {roundIndex + 1} of 3</p>
 
-      <p className="grandma-pattern-name">{patternName}</p>
+      {diedAtLevelName && (
+        <p className="grandma-died-at-level">
+          Died in <span className="grandma-died-level-name">{diedAtLevelName}</span>
+        </p>
+      )}
 
       <div className="grandma-round-score-block">
         <span className="grandma-round-score-num">{score}</span>
-        <span className="grandma-round-score-label">points</span>
+        <span className="grandma-round-score-label">seconds survived</span>
       </div>
 
       <p className="grandma-round-sub">
-        Grandma survived {score} second{score !== 1 ? 's' : ''}.
+        {score < 10
+          ? 'Better luck next round!'
+          : score < 30
+          ? 'Solid effort.'
+          : score < 50
+          ? 'Impressive endurance!'
+          : 'Legendary survivor!'}
       </p>
 
       <button className="btn-primary" onClick={onNext}>

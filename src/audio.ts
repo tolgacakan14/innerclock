@@ -18,7 +18,7 @@
  *   musicManager.subscribe(fn)         — listen for enabled changes
  */
 
-export type TrackKey = 'main' | 'rush' | 'grandma' | 'golf';
+export type TrackKey = 'main' | 'rush' | 'grandma' | 'golf' | 'time';
 
 const STORAGE_KEY = 'innerclock_music_on';
 
@@ -28,6 +28,7 @@ const TRACKS: Record<TrackKey, string[]> = {
   rush:    ['/audio/rush-loop.mp3',       '/audio/background-loop.mp3'],
   grandma: ['/audio/grandma-walk.mp3',   '/audio/grandma%20walk.mp3', '/audio/background-loop.mp3'],
   golf:    ['/audio/golf.mp3',            '/audio/background-loop.mp3'],
+  time:    ['/audio/time-mode.mp3',       '/audio/background-loop.mp3'],
 };
 
 const DEFAULT_VOLUME = 0.35;
@@ -43,7 +44,7 @@ class BackgroundMusicManager {
   private listeners      = new Set<(enabled: boolean) => void>();
 
   constructor() {
-    this._enabled = localStorage.getItem(STORAGE_KEY) === 'true';
+    this._enabled = localStorage.getItem(STORAGE_KEY) !== 'false';
     this._init();
   }
 

@@ -50,9 +50,9 @@ function fmtDateTime(iso: string): string {
 
 // Rank badge helper
 function rankLabel(i: number) {
-  if (i === 0) return '🥇';
-  if (i === 1) return '🥈';
-  if (i === 2) return '🥉';
+  if (i === 0) return '1st';
+  if (i === 1) return '2nd';
+  if (i === 2) return '3rd';
   return `#${i + 1}`;
 }
 

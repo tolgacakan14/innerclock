@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { GolfRoundResult } from '../types';
+import type { GolfRoundResult, RoomContext } from '../types';
 import { golfCourses }           from '../data/golfCourses';
 import { useBackgroundMusic }    from '../hooks/useBackgroundMusic';
+import { makeGameRng }           from '../utils';
 import GolfIntroScreen            from './GolfIntroScreen';
 import GolfGameScreen             from './GolfGameScreen';
 import GolfRoundCompleteScreen    from './GolfRoundCompleteScreen';
@@ -12,19 +13,23 @@ type GolfScreen = 'intro' | 'playing' | 'roundComplete' | 'results';
 interface Props {
   playerName:   string;
   onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  roomContext?: RoomContext;
 }
 
-/** Pick n unique items from an array at random */
-function pickRandom<T>(arr: T[], n: number): T[] {
-  const copy = [...arr].sort(() => Math.random() - 0.5);
+/** Pick n unique items from an array using provided RNG (defaults to Math.random) */
+function pickRandom<T>(arr: T[], n: number, rng: () => number = Math.random): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
   return copy.slice(0, n);
 }
 
 export default function GolfGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }           = useBackgroundMusic();
   const [screen,       setScreen]       = useState<GolfScreen>('intro');
-  const [selected,     setSelected]     = useState(() => pickRandom(golfCourses, 5));
+  const [selected,     setSelected]     = useState(() => pickRandom(golfCourses, 5, makeGameRng(roomContext, 'golf')));
   const [currentRound, setCurrentRound] = useState(0);   // 0–4
   const [roundResults, setRoundResults] = useState<GolfRoundResult[]>([]);
   const [lastShots,    setLastShots]    = useState(0);   // shots for the just-completed round
@@ -34,7 +39,7 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
 
   function handleStart() {
     setTrack('golf');
-    setSelected(pickRandom(golfCourses, 5));
+    setSelected(pickRandom(golfCourses, 5, makeGameRng(roomContext, 'golf')));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);
@@ -65,7 +70,7 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
 
   function handlePlayAgain() {
     setTrack('golf');
-    setSelected(pickRandom(golfCourses, 5));
+    setSelected(pickRandom(golfCourses, 5, makeGameRng(roomContext, 'golf')));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);

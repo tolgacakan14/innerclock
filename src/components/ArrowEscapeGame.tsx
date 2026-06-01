@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { ArrowEscapeRoundResult } from '../types';
+import type { ArrowEscapeRoundResult, RoomContext } from '../types';
 import { arrowEscapeBoards }          from '../data/arrowEscapeBoards';
+import { makeGameRng }                from '../utils';
 import { useBackgroundMusic }         from '../hooks/useBackgroundMusic';
 import ArrowEscapeIntroScreen         from './ArrowEscapeIntroScreen';
 import ArrowEscapeGameScreen          from './ArrowEscapeGameScreen';
@@ -12,7 +13,7 @@ type AEScreen = 'intro' | 'playing' | 'roundResult' | 'results';
 interface Props {
   playerName:   string;
   onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  roomContext?: RoomContext;
 }
 
 /**
@@ -21,18 +22,18 @@ interface Props {
  * no repeat within the same session).
  * Round 3: one board at random from the finalHard pool.
  */
-function pickBoards() {
+function pickBoards(rng: () => number = Math.random) {
   const medPool  = arrowEscapeBoards.filter(b => b.difficulty === 'mediumHard');
   const finPool  = arrowEscapeBoards.filter(b => b.difficulty === 'finalHard');
 
   // Fisher-Yates shuffle a copy so rounds 1 & 2 are always different boards
   const shuffled = [...medPool];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  const r3     = finPool[Math.floor(Math.random() * finPool.length)];
+  const r3     = finPool[Math.floor(rng() * finPool.length)];
   const picked = [shuffled[0], shuffled[1], r3];
 
   if (import.meta.env.DEV) {
@@ -49,14 +50,14 @@ export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Pro
   const { setTrack } = useBackgroundMusic();
   useEffect(() => { setTrack('main'); return () => { setTrack('main'); }; }, []);
   const [screen,       setScreen]       = useState<AEScreen>('intro');
-  const [selected,     setSelected]     = useState(() => pickBoards());
+  const [selected,     setSelected]     = useState(() => pickBoards(makeGameRng(roomContext, 'arrowEscape')));
   const [currentRound, setCurrentRound] = useState(0);
   const [roundResults, setRoundResults] = useState<ArrowEscapeRoundResult[]>([]);
   const [lastResult,   setLastResult]   = useState<{ solveTime: number; mistakes: number }>({ solveTime: 0, mistakes: 0 });
   const [playCount,    setPlayCount]    = useState(0);
 
   function handleStart() {
-    setSelected(pickBoards());
+    setSelected(pickBoards(makeGameRng(roomContext, 'arrowEscape')));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);
@@ -86,7 +87,7 @@ export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Pro
   }
 
   function handlePlayAgain() {
-    setSelected(pickBoards());
+    setSelected(pickBoards(makeGameRng(roomContext, 'arrowEscape')));
     setCurrentRound(0);
     setRoundResults([]);
     setPlayCount(c => c + 1);

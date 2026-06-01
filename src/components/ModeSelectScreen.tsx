@@ -488,7 +488,7 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
         <button className="home-card home-card--time" onClick={() => onSelect('time')}>
           <div className="home-card-graphic"><TimeGraphic/></div>
           <div className="home-card-foot">
-            <p className="home-card-title">Time Mode</p>
+            <p className="home-card-title">Time</p>
             <p className="home-card-desc">Feel the duration</p>
           </div>
         </button>
@@ -496,7 +496,7 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
         <button className="home-card home-card--color" onClick={() => onSelect('color')}>
           <div className="home-card-graphic"><ColorGraphic/></div>
           <div className="home-card-foot">
-            <p className="home-card-title">Colour Mode</p>
+            <p className="home-card-title">Colour</p>
             <p className="home-card-desc">Match the hue</p>
           </div>
         </button>
@@ -504,7 +504,7 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
         <button className="home-card home-card--rush" onClick={() => onSelect('rush')}>
           <div className="home-card-graphic"><RushGraphic/></div>
           <div className="home-card-foot">
-            <p className="home-card-title">Rush Mode</p>
+            <p className="home-card-title">Rush</p>
             <p className="home-card-desc">Hit every target</p>
           </div>
         </button>
@@ -512,7 +512,7 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
         <button className="home-card home-card--golf" onClick={() => onSelect('golf')}>
           <div className="home-card-graphic"><GolfGraphic/></div>
           <div className="home-card-foot">
-            <p className="home-card-title">Golf Mode</p>
+            <p className="home-card-title">Golf</p>
             <p className="home-card-desc">Fewest shots wins</p>
           </div>
         </button>
@@ -566,12 +566,12 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
           <div className="home-friends-actions">
             {onCreateRoom && (
               <button className="home-friends-btn" onClick={onCreateRoom}>
-                🏠 Create Room
+                Create Room
               </button>
             )}
             {onJoinRoom && (
               <button className="home-friends-btn" onClick={onJoinRoom}>
-                🔗 Join Room
+                Join Room
               </button>
             )}
           </div>

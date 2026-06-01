@@ -1362,4 +1362,94 @@ export const arrowEscapeBoards: ArrowBoard[] = [
       { id:25, row:2, col:6, dir:'down',  color:CY },  // blocked by id12 (col6 row8>2)
     ],
   },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 36  "Spiral Lock"  9×9  25 arrows
+  // Single START (0,8)→.  Perimeter A+B+C sweep, then two col chains cross-
+  // lock (4,4)→ which in turn double-locks (5,4)↑ and (7,4)↑.
+  // STARTs: (0,8)→ only.
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 36, name: 'Spiral Lock', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      // Chain A — row-0 right sweep
+      { id:1,  row:0, col:8, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:6, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:4, dir:'right', color:YL },  // blocked by id2 → unlocks id22
+      { id:4,  row:0, col:2, dir:'right', color:MG },  // blocked by id3
+      { id:5,  row:0, col:0, dir:'right', color:BL },  // blocked by id4 → unlocks id6
+      // Chain B — col-0 up sweep
+      { id:6,  row:2, col:0, dir:'up',    color:PU },  // blocked by id5 (col0 row0<2)
+      { id:7,  row:4, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:6, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:8, col:0, dir:'up',    color:CY },  // blocked by id8 → unlocks id10
+      // Chain C — row-8 left sweep (triggered by id9 — (8,0)↑ in row 8 col 0 blocks (8,2)←)
+      { id:10, row:8, col:2, dir:'left',  color:GR },  // blocked by id9 (row8 col0<2)
+      { id:11, row:8, col:4, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:8, col:6, dir:'left',  color:MG },  // blocked by id11 → unlocks id17
+      { id:13, row:8, col:8, dir:'left',  color:BL },  // blocked by id12 → unlocks id14
+      // Chain D — col-8 down sweep
+      { id:14, row:6, col:8, dir:'down',  color:PU },  // blocked by id13 (col8 row8>6)
+      { id:15, row:4, col:8, dir:'down',  color:OR },  // blocked by id14
+      { id:16, row:2, col:8, dir:'down',  color:WH },  // blocked by id15
+      // Chain E — col-6 down (unlocked by id12)
+      { id:17, row:6, col:6, dir:'down',  color:CY },  // blocked by id12 (col6 row8>6)
+      { id:18, row:4, col:6, dir:'down',  color:GR },  // blocked by id17
+      { id:19, row:2, col:6, dir:'down',  color:YL },  // blocked by id18
+      // Cross-lock: id20 requires BOTH id15 (col8) AND id18 (col6) removed
+      { id:20, row:4, col:4, dir:'right', color:MG },  // blocked by id15 (row4 col8>4) AND id18 (row4 col6>4)
+      { id:21, row:4, col:2, dir:'right', color:BL },  // blocked by id20 (row4 col4>2)
+      // Chain F — col-4 up (unlocked by id3, second lock from id20)
+      { id:22, row:3, col:4, dir:'up',    color:PU },  // blocked by id3 (col4 row0<3)
+      { id:23, row:5, col:4, dir:'up',    color:OR },  // blocked by id22 (col4 row3<5) AND id20 (col4 row4<5)
+      { id:24, row:7, col:4, dir:'up',    color:WH },  // blocked by id23 (col4 row5<7)
+      // Final anchor — requires col-4 chain to fully clear
+      { id:25, row:7, col:6, dir:'left',  color:CY },  // blocked by id24 (row7 col4<6)
+    ],
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BOARD 37  "Iron Web"  9×9  25 arrows
+  // Two STARTs. Four perimeter sweeps + col-2 up and col-4 down chains;
+  // final cross-lock (7,6)← needs BOTH col-0 AND col-2 chains to finish.
+  // STARTs: (0,8)→  (8,0)←
+  // ════════════════════════════════════════════════════════════════════════
+  {
+    id: 37, name: 'Iron Web', gridSize: 9, difficulty: 'finalHard',
+    arrows: [
+      // Chain A — row-0 right sweep
+      { id:1,  row:0, col:8, dir:'right', color:CY },  // START
+      { id:2,  row:0, col:6, dir:'right', color:GR },  // blocked by id1
+      { id:3,  row:0, col:4, dir:'right', color:YL },  // blocked by id2
+      { id:4,  row:0, col:2, dir:'right', color:MG },  // blocked by id3 → unlocks id19
+      { id:5,  row:0, col:0, dir:'right', color:BL },  // blocked by id4 → unlocks id6
+      // Chain B — col-0 up sweep (unlocked by id5)
+      { id:6,  row:1, col:0, dir:'up',    color:PU },  // blocked by id5 (col0 row0<1)
+      { id:7,  row:3, col:0, dir:'up',    color:OR },  // blocked by id6
+      { id:8,  row:5, col:0, dir:'up',    color:WH },  // blocked by id7
+      { id:9,  row:7, col:0, dir:'up',    color:CY },  // blocked by id8 → feeds cross-lock
+      // Chain C — row-8 left sweep (START)
+      { id:10, row:8, col:0, dir:'left',  color:GR },  // START
+      { id:11, row:8, col:2, dir:'left',  color:YL },  // blocked by id10
+      { id:12, row:8, col:4, dir:'left',  color:MG },  // blocked by id11 → unlocks id22
+      { id:13, row:8, col:6, dir:'left',  color:BL },  // blocked by id12
+      { id:14, row:8, col:8, dir:'left',  color:PU },  // blocked by id13 → unlocks id15
+      // Chain D — col-8 down sweep (unlocked by id14)
+      { id:15, row:7, col:8, dir:'down',  color:OR },  // blocked by id14 (col8 row8>7)
+      { id:16, row:5, col:8, dir:'down',  color:WH },  // blocked by id15
+      { id:17, row:3, col:8, dir:'down',  color:CY },  // blocked by id16
+      { id:18, row:1, col:8, dir:'down',  color:GR },  // blocked by id17
+      // Chain E — col-2 up (unlocked by id4)
+      { id:19, row:2, col:2, dir:'up',    color:YL },  // blocked by id4 (col2 row0<2)
+      { id:20, row:5, col:2, dir:'up',    color:MG },  // blocked by id19
+      { id:21, row:7, col:2, dir:'up',    color:BL },  // blocked by id20 → feeds cross-lock
+      // Chain F — col-4 down (unlocked by id12)
+      { id:22, row:6, col:4, dir:'down',  color:PU },  // blocked by id12 (col4 row8>6)
+      { id:23, row:4, col:4, dir:'down',  color:OR },  // blocked by id22
+      { id:24, row:2, col:4, dir:'down',  color:WH },  // blocked by id23
+      // Cross-lock: (7,6)← blocked by id9 (7,0)↑ [row7 col0<6] AND id21 (7,2)↑ [row7 col2<6]
+      // Requires BOTH chain B (5 arrows from chain A) AND chain E (4 arrows from chain A)
+      { id:25, row:7, col:6, dir:'left',  color:CY },  // blocked by id9 (row7 col0<6) AND id21 (row7 col2<6)
+    ],
+  },
 ];

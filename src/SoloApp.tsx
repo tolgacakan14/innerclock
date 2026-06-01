@@ -57,6 +57,7 @@ export default function SoloApp() {
             </svg>
           </div>
           <h1 className="home-logo name-screen-logo">Krone</h1>
+          <p className="home-tagline-perception">Test your perception.</p>
           <p className="home-tagline">Fast games. Real rivalries.</p>
           <p className="home-tagline-sub">Play with friends · Same room · Real competition</p>
         </div>

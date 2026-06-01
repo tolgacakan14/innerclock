@@ -85,9 +85,10 @@ export interface GolfRoundResult {
 
 // ── Grandma Walking mode ──────────────────────────────────────────────────────
 export interface GrandmaRoundResult {
-  patternId:   number;
-  patternName: string;
-  score:       number;   // floor(seconds survived)
+  patternId:      number;
+  patternName:    string;
+  score:          number;   // floor(seconds survived)
+  diedAtLevelName?: string; // e.g. 'Last Dance', 'Virgin Mode'
 }
 
 // ── Arrow Escape mode ─────────────────────────────────────────────────────────

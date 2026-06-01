@@ -131,7 +131,7 @@ export default function JoinRoomScreen({ onBack, onJoined, initialCode = '' }: P
       </button>
 
       <div className="room-form-brand">
-        <span className="room-form-icon">🔗</span>
+        <span className="room-form-icon">→</span>
         <h2 className="room-form-title">Join a Room</h2>
         <p className="room-form-sub">Enter the room code shared with you</p>
       </div>

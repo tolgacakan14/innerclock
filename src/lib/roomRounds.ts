@@ -64,12 +64,12 @@ export const MODE_LABELS: Record<string, string> = {
 };
 
 export const MODE_LABELS_FULL: Record<string, string> = {
-  rush:        'Rush Mode',
-  color:       'Colour Mode',
-  golf:        'Golf Mode',
+  rush:        'Rush',
+  color:       'Colour',
+  golf:        'Golf',
   grandma:     'Grandma Walking',
   arrowEscape: 'Arrow Escape',
-  time:        'Time Mode',
+  time:        'Time',
   sequence:    'Sequence Tap',
   memory:      'Memory Grid',
   timing:      'Tap Timing',
@@ -89,15 +89,15 @@ export const MODE_SCORE_LABEL: Record<string, string> = {
 };
 
 export const MODE_ICONS: Record<string, string> = {
-  rush:        '⚡',
-  color:       '🎨',
-  golf:        '⛳',
-  grandma:     '👵',
-  arrowEscape: '🏹',
-  time:        '⏱',
-  sequence:    '🔢',
-  memory:      '🧠',
-  timing:      '🎯',
+  rush:        '▷',
+  color:       '◉',
+  golf:        '◈',
+  grandma:     '♟',
+  arrowEscape: '↗',
+  time:        '◷',
+  sequence:    '▣',
+  memory:      '▦',
+  timing:      '◆',
 };
 
 /** Modes where lower score is better (shots, seconds). */

@@ -11,6 +11,32 @@ const TILE_COLORS = [
   '#FFD60A', // yellow
 ];
 
+/** Musical pitches per tile — pentatonic scale for pleasant chords. */
+const TILE_FREQS = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.5];
+
+// ── Web Audio beep helper ─────────────────────────────────────────────────────
+
+function playBeep(
+  tileIndex: number,
+  ctx: AudioContext,
+  volume = 0.35,
+  dur = 0.15,
+) {
+  try {
+    const freq = TILE_FREQS[tileIndex] ?? 440;
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur);
+  } catch (_) { /* audio not available — silently skip */ }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Sequence length grows by 1 each level, starting at 3. */
@@ -45,7 +71,7 @@ function generateSeq(len: number): number[] {
 type Phase = 'idle' | 'showing' | 'input' | 'correct' | 'wrong';
 
 interface Props {
-  onComplete: (completedLevels: number, maxSeqLen: number, score: number) => void;
+  onComplete: (completedLevels: number, maxSeqLen: number, score: number, elapsedTime: number) => void;
   onHome:     () => void;
 }
 
@@ -70,6 +96,29 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
+  // ── Web Audio ─────────────────────────────────────────────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  function getAudioCtx(): AudioContext | null {
+    if (!audioCtxRef.current) {
+      try {
+        audioCtxRef.current = new (window.AudioContext ?? (window as any).webkitAudioContext)();
+      } catch (_) { return null; }
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+    return audioCtxRef.current;
+  }
+
+  function beep(tileIdx: number, vol = 0.35) {
+    const ctx = getAudioCtx();
+    if (ctx) playBeep(tileIdx, ctx, vol);
+  }
+
+  // ── Elapsed time ──────────────────────────────────────────────────────────
+  const startTimeRef = useRef<number>(0);
+
   function clearTimers() {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
@@ -92,7 +141,10 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
 
     for (let i = 0; i < len; i++) {
       const idx = seq[i];
-      const t1 = setTimeout(() => setActiveIdx(idx), t);
+      const t1 = setTimeout(() => {
+        setActiveIdx(idx);
+        beep(idx, 0.22); // softer beep during demo
+      }, t);
       t += flash;
       const t2 = setTimeout(() => setActiveIdx(-1), t);
       t += gap;
@@ -108,11 +160,13 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
 
   // Start game on mount
   useEffect(() => {
+    startTimeRef.current = performance.now();
     const t = setTimeout(() => startLevel(1), 500);
     return () => {
       clearTimeout(t);
       clearTimers();
       if (pressedTimerRef.current) clearTimeout(pressedTimerRef.current);
+      audioCtxRef.current?.close().catch(() => {});
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -120,6 +174,9 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
 
   function handleTileTap(tileIndex: number) {
     if (phase !== 'input' || doneRef.current) return;
+
+    // Lazy-init AudioContext on first real user gesture
+    getAudioCtx();
 
     // ── Instant visual feedback: light up the tapped tile ─────────────────────
     if (pressedTimerRef.current) clearTimeout(pressedTimerRef.current);
@@ -130,16 +187,20 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
 
     if (tileIndex !== expected) {
       // Wrong tap — game over
+      beep(tileIndex, 0.25);
       setWrongTileIdx(tileIndex);
       setPhase('wrong');
       doneRef.current = true;
+      const elapsed = (performance.now() - startTimeRef.current) / 1000;
       const score = completedRef.current * 10 + maxSeqLenRef.current * 5;
       const tid = setTimeout(() => {
-        onCompleteRef.current(completedRef.current, maxSeqLenRef.current, score);
+        onCompleteRef.current(completedRef.current, maxSeqLenRef.current, score, +elapsed.toFixed(1));
       }, 1000);
       timersRef.current.push(tid);
       return;
     }
+
+    beep(tileIndex, 0.35); // correct tap beep
 
     const newProgress = [...inputProgress, tileIndex];
     setInputProgress(newProgress);
@@ -170,8 +231,8 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
         <button className="color-overlay-btn" onClick={onHome} aria-label="Back to home">
           ← Home
         </button>
-        <span className="seq-level-label">Level {level}</span>
-        <span className="seq-completed-count">{completedRef.current} ✓</span>
+        <span className="seq-level-label">Level {level} <span className="seq-done-inline">{completedRef.current > 0 ? `· ${completedRef.current}✓` : ''}</span></span>
+        <span className="seq-game-name">Sequence Tap</span>
       </div>
 
       {/* Phase status */}

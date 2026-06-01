@@ -1,5 +1,43 @@
 /// <reference types="vite/client" />
-import type { TargetColor } from './types';
+import type { TargetColor, RoomContext } from './types';
+
+// ── Seeded RNG ────────────────────────────────────────────────────────────────
+
+/** Mulberry32 — fast 32-bit seeded PRNG. Returns values in [0, 1). */
+function mulberry32(seed: number): () => number {
+  let s = seed;
+  return function () {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** FNV-1a string → uint32 hash. */
+function hashStr(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Returns a deterministic RNG for room play, or Math.random for solo.
+ * All players in the same room + round + mode get identical content.
+ *
+ * @param roomContext - RoomContext when inside a multiplayer room, undefined for solo
+ * @param mode        - game mode string e.g. 'golf', 'time', 'grandma' …
+ */
+export function makeGameRng(
+  roomContext: RoomContext | undefined,
+  mode: string,
+): () => number {
+  if (!roomContext) return Math.random;
+  const key = `${roomContext.roomId}:${roomContext.roundId ?? roomContext.roundNumber ?? '0'}:${mode}`;
+  return mulberry32(hashStr(key));
+}
 
 // ── Time mode ────────────────────────────────────────────────────────────────
 
@@ -41,8 +79,8 @@ export function calcRushScore(taps: number): number {
 }
 
 // Hidden target duration 1.5–7.0 s, one decimal place
-export function randomTarget(): number {
-  return Math.round((Math.random() * 5.5 + 1.5) * 10) / 10;
+export function randomTarget(rng: () => number = Math.random): number {
+  return Math.round((rng() * 5.5 + 1.5) * 10) / 10;
 }
 
 // ── Color mode — random target ────────────────────────────────────────────────
@@ -77,8 +115,8 @@ const COLOR_CATEGORIES: ColorCategory[] = [
   { name: 'Bright',  s: [65, 100], l: [55, 72] },
 ];
 
-function rng(min: number, max: number): number {
-  return Math.round(Math.random() * (max - min) + min);
+function rng(min: number, max: number, rand: () => number = Math.random): number {
+  return Math.round(rand() * (max - min) + min);
 }
 
 /**
@@ -88,14 +126,14 @@ function rng(min: number, max: number): number {
  *  - one shuffled visual category per slot (Vibrant/Deep/Soft/Muted/Bright)
  *  - dev-mode logging of HSL + category per round
  */
-export function generateDiverseColorSet(count: number): TargetColor[] {
+export function generateDiverseColorSet(count: number, rand: () => number = Math.random): TargetColor[] {
   const slotSize  = 360 / count;
-  const hueOffset = Math.random() * 360;
+  const hueOffset = rand() * 360;
 
   // Shuffle categories so we don't always start with the same one
   const cats = [...COLOR_CATEGORIES];
   for (let i = cats.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [cats[i], cats[j]] = [cats[j], cats[i]];
   }
 
@@ -104,7 +142,7 @@ export function generateDiverseColorSet(count: number): TargetColor[] {
   for (let i = 0; i < count; i++) {
     const cat    = cats[i % cats.length];
     const centre = (hueOffset + i * slotSize) % 360;
-    let   h      = Math.round((centre + (Math.random() - 0.5) * slotSize * 0.7 + 360) % 360);
+    let   h      = Math.round((centre + (rand() - 0.5) * slotSize * 0.7 + 360) % 360);
 
     // Enforce ≥ 30° hue gap from the previous color when saturation is similar
     if (colors.length > 0) {
@@ -116,7 +154,7 @@ export function generateDiverseColorSet(count: number): TargetColor[] {
       }
     }
 
-    colors.push({ h, s: rng(cat.s[0], cat.s[1]), l: rng(cat.l[0], cat.l[1]) });
+    colors.push({ h, s: rng(cat.s[0], cat.s[1], rand), l: rng(cat.l[0], cat.l[1], rand) });
   }
 
   if (import.meta.env.DEV) {

@@ -179,18 +179,22 @@ export default function TapTimingGameScreen({ onComplete, onHome }: Props) {
         >
           ← Home
         </button>
-        <span className={`tt-timer${isCritical ? ' tt-timer--critical' : ''}`}>
-          {timeLeft.toFixed(1)}s
-        </span>
+        {timeLeft > 0 && (
+          <span className={`tt-timer${isCritical ? ' tt-timer--critical' : ''}`}>
+            {timeLeft.toFixed(1)}s
+          </span>
+        )}
         <span className="tt-score-live">{score}</span>
       </div>
 
-      {/* Combo */}
-      {combo >= 2 && (
-        <div className="tt-combo">
-          x{combo} combo
-        </div>
-      )}
+      {/* Combo — always render slot to keep bar centered */}
+      <div className="tt-combo-slot">
+        {combo >= 2 && (
+          <div className="tt-combo" key={combo}>
+            x{combo} combo
+          </div>
+        )}
+      </div>
 
       {/* Bar */}
       <div className="tt-bar-wrap">

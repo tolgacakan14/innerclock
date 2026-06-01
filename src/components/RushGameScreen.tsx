@@ -421,6 +421,61 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   // ── Falling ticket refs ────────────────────────────────────────────────────
   const ticketIntervalRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Web Audio (SFX) ───────────────────────────────────────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  function getAudioCtx(): AudioContext | null {
+    if (!audioCtxRef.current) {
+      try {
+        audioCtxRef.current = new (window.AudioContext ?? (window as any).webkitAudioContext)();
+      } catch { return null; }
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+    return audioCtxRef.current;
+  }
+
+  /** Standard hit beep: short triangle tone. isFinal → higher pitch. */
+  function playHitSound(isFinalRush: boolean) {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+      const freq = isFinalRush ? 660 : 440;
+      const dur  = isFinalRush ? 0.10 : 0.08;
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + dur);
+    } catch { /* silent */ }
+  }
+
+  /** Special target chime: two-note ding (root + fifth). */
+  function playSpecialSound() {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+      [[880, 0, 0.18], [1320, 0.04, 0.14]].forEach(([freq, delay, vol]) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.22);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.25);
+      });
+    } catch { /* silent */ }
+  }
+
   // ── Bonus chaser helpers ──────────────────────────────────────────────────
 
   function scheduleNextBonus() {
@@ -473,6 +528,7 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   function handleBonusTap(e: React.PointerEvent) {
     e.stopPropagation();
     if (doneRef.current || !bonusChaserRef.current) return;
+    playSpecialSound();
 
     const bc  = bonusChaserRef.current;
     const pts = 5;
@@ -523,6 +579,7 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   function handleGrannyTap(e: React.PointerEvent) {
     e.stopPropagation();
     if (doneRef.current || !bonusGrannyRef.current) return;
+    playSpecialSound();
 
     const bg  = bonusGrannyRef.current;
     const pts = 8;
@@ -567,6 +624,7 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
   function handleKroneTap(e: React.PointerEvent) {
     e.stopPropagation();
     if (doneRef.current || !kroneBonusRef.current) return;
+    playSpecialSound();
     const kb  = kroneBonusRef.current;
     const pts = 8;
     bonusPointsRef.current += pts;
@@ -708,6 +766,7 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
       clearTimeout(krone1Timer);
       clearTimeout(krone2Timer);
       clearTimeout(ticketTimer);
+      audioCtxRef.current?.close().catch(() => {});
     };
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -721,6 +780,7 @@ export default function RushGameScreen({ onComplete, onHome }: Props) {
     const effectiveDur = extraTimeGrantedRef.current ? BONUS_DURATION : BASE_DURATION;
     const isFinal      = (effectiveDur - elapsed) <= 10;
     const pts          = isFinal ? 2 : 1;
+    playHitSound(isFinal);
 
     if (isFinal) {
       finalRushHitsRef.current++;

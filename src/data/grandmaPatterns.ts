@@ -101,6 +101,81 @@ export const grandmaPatterns: GrandmaPattern[] = [
     sequence: ['low', 'high', 'gap', 'high', 'low', 'gap', 'low'],
     baseGap: 390, variance: 55 },
 
+  // ── 17. Bunny Hop — three quick lows then breathe ────────────────────────
+  { id: 17, name: 'Bunny Hop',
+    sequence: ['low', 'low', 'low', 'gap'],
+    baseGap: 370, variance: 45 },
+
+  // ── 18. Tunnel Rush — ceiling after every gap ────────────────────────────
+  { id: 18, name: 'Tunnel Rush',
+    sequence: ['gap', 'high', 'gap', 'high', 'low'],
+    baseGap: 410, variance: 58 },
+
+  // ── 19. Low Rider — five consecutive crouch bars ─────────────────────────
+  { id: 19, name: 'Low Rider',
+    sequence: ['high', 'high', 'high', 'high', 'high', 'low'],
+    baseGap: 360, variance: 42 },
+
+  // ── 20. Staircase — ascending pairs ──────────────────────────────────────
+  { id: 20, name: 'Staircase',
+    sequence: ['low', 'low', 'high', 'high', 'gap'],
+    baseGap: 375, variance: 52 },
+
+  // ── 21. Canyon — gap between two lows ────────────────────────────────────
+  { id: 21, name: 'Canyon',
+    sequence: ['low', 'gap', 'low', 'high', 'gap'],
+    baseGap: 420, variance: 55 },
+
+  // ── 22. Dizzy — reverse alternating, gap break ───────────────────────────
+  { id: 22, name: 'Dizzy',
+    sequence: ['high', 'low', 'high', 'low', 'gap', 'high'],
+    baseGap: 358, variance: 48 },
+
+  // ── 23. Sprint — dense lows, tight gaps ──────────────────────────────────
+  { id: 23, name: 'Sprint',
+    sequence: ['low', 'low', 'high', 'low', 'low'],
+    baseGap: 338, variance: 38 },
+
+  // ── 24. The Pit — double gap no pause ────────────────────────────────────
+  { id: 24, name: 'The Pit',
+    sequence: ['gap', 'gap', 'high', 'low', 'gap'],
+    baseGap: 435, variance: 52 },
+
+  // ── 25. Echo — pairs mirrored ────────────────────────────────────────────
+  { id: 25, name: 'Echo',
+    sequence: ['low', 'high', 'low', 'gap', 'low', 'high'],
+    baseGap: 368, variance: 52 },
+
+  // ── 26. Cross Winds — gap-low-high triplet loop ──────────────────────────
+  { id: 26, name: 'Cross Winds',
+    sequence: ['gap', 'low', 'high', 'gap', 'low', 'high'],
+    baseGap: 395, variance: 50 },
+
+  // ── 27. Hurdle City — lots of lows, one pit ──────────────────────────────
+  { id: 27, name: 'Hurdle City',
+    sequence: ['low', 'low', 'low', 'gap', 'low', 'low'],
+    baseGap: 350, variance: 45 },
+
+  // ── 28. Duck Hunt — bursts of two ceilings ───────────────────────────────
+  { id: 28, name: 'Duck Hunt',
+    sequence: ['high', 'high', 'low', 'high', 'high', 'gap'],
+    baseGap: 352, variance: 44 },
+
+  // ── 29. Freefall — gap heavy with intervening bars ───────────────────────
+  { id: 29, name: 'Freefall',
+    sequence: ['gap', 'low', 'gap', 'low', 'high'],
+    baseGap: 418, variance: 58 },
+
+  // ── 30. Marathon — long mixed cycle ──────────────────────────────────────
+  { id: 30, name: 'Marathon',
+    sequence: ['low', 'high', 'low', 'high', 'low', 'gap', 'high', 'low'],
+    baseGap: 365, variance: 50 },
+
+  // ── 31. Switchback — gap-high-gap-low-high alternating ───────────────────
+  { id: 31, name: 'Switchback',
+    sequence: ['high', 'gap', 'low', 'gap', 'high', 'low', 'gap'],
+    baseGap: 400, variance: 55 },
+
   // ── 16. Hot Mode — extreme 2× speed challenge ────────────────────────────
   { id: 16, name: 'Hot Mode',
     sequence: ['low', 'high', 'gap', 'low', 'high', 'gap', 'low', 'high'],

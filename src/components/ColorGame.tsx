@@ -4,7 +4,7 @@ import ColorObserveScreen  from './ColorObserveScreen';
 import ColorMatchScreen    from './ColorMatchScreen';
 import ColorFeedbackScreen from './ColorFeedbackScreen';
 import ColorResultsScreen  from './ColorResultsScreen';
-import { generateDiverseColorSet, calcColorScore } from '../utils';
+import { generateDiverseColorSet, calcColorScore, makeGameRng } from '../utils';
 import type { TargetColor, ColorRound, RoomContext } from '../types';
 
 type ColorScreen = 'start' | 'observe' | 'match' | 'feedback' | 'results';
@@ -23,7 +23,8 @@ export default function ColorGame({ playerName, onExit, roomContext }: Props) {
   const [pendingSelected,  setPendingSelected]  = useState<TargetColor>({ h: 180, s: 60, l: 50 });
 
   function handleStart() {
-    setTargets(generateDiverseColorSet(5));
+    const rng = makeGameRng(roomContext, 'color');
+    setTargets(generateDiverseColorSet(5, rng));
     setRounds([]);
     setCurrentRound(0);
     setScreen('observe');
