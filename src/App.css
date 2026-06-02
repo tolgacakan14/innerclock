@@ -2548,9 +2548,9 @@ body {
 .grandma-game-wrap {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100dvh;
   z-index: 10;
-  display: flex;
-  flex-direction: column;
   background: #09090C;
   animation: colorScreenEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
   touch-action: none;
@@ -2559,15 +2559,58 @@ body {
   overflow: hidden;
 }
 
-/* ── Game header ─────────────────────────────────────────────────────────── */
+/* ── Touch zone overlay ──────────────────────────────────────────────────── */
+.grandma-zones {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 5;
+  padding: 0 0 max(20px, env(safe-area-inset-bottom, 14px));
+}
+
+.grandma-zone-label {
+  width: 50%;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.18);
+}
+
+.grandma-zone-label--duck { text-align: center; padding-right: 1px; }
+.grandma-zone-label--jump { text-align: center; padding-left:  1px; }
+
+.grandma-zone-divider {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  bottom: max(44px, env(safe-area-inset-bottom, 14px));
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.07) 30%,
+    rgba(255, 255, 255, 0.07) 70%,
+    transparent 100%
+  );
+  transform: translateX(-50%);
+}
+
+/* ── Game header — floats over the full-screen canvas ───────────────────── */
 .grandma-game-header {
-  flex-shrink: 0;
+  position: absolute;
+  top: 0; left: 0; right: 0;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 8px;
-  padding: max(48px, calc(env(safe-area-inset-top, 0px) + 16px)) 20px 10px;
-  z-index: 3;
+  padding: max(14px, env(safe-area-inset-top, 10px)) 20px 12px;
+  z-index: 20;
+  background: linear-gradient(to bottom, rgba(9,9,12,0.80) 60%, transparent 100%);
 }
 
 .grandma-round-label {
@@ -2588,10 +2631,10 @@ body {
   line-height: 1;
 }
 
-/* ── Canvas field ─────────────────────────────────────────────────────────── */
+/* ── Canvas field — fills full screen beneath floating header ────────────── */
 .grandma-game-field {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   display: flex;
   align-items: stretch;
@@ -3500,11 +3543,6 @@ body {
  100% { transform: translate( 0,     0);    }
 }
 
-/* Portrait-mode: game canvas container rotated -90° inside fixed wrap */
-.grandma-game-field--portrait {
-  /* overflow: visible lets rotated inner content remain visible */
-  overflow: visible;
-}
 
 /* ── Grandma — Falling KRONE tickets (Last Dance + Virgin Mode) ─────────── */
 /*
@@ -4017,6 +4055,11 @@ body {
 }
 .room-submit-after-btns { display: flex; flex-direction: column; gap: 8px; }
 .room-submit-back { text-align: center; }
+.room-submit-submitting {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: center; padding: 10px 0;
+}
+.room-submit-submitting-label { font-size: 0.86rem; color: rgba(255,255,255,0.55); }
 
 /* ── Loading / Not-found screens ─────────────────────────────── */
 .room-loading-screen,
@@ -5053,6 +5096,130 @@ body {
   color: rgba(255,255,255,0.94);
 }
 
+/* Form tab — golden accent */
+.sb-tab--form {
+  background: rgba(255,200,0,0.10);
+  border-color: rgba(255,200,0,0.22);
+  color: rgba(255,210,0,0.75);
+  font-weight: 700;
+}
+.sb-tab--form.sb-tab--active {
+  background: rgba(255,200,0,0.20);
+  border-color: rgba(255,210,0,0.55);
+  color: rgba(255,220,0,1.00);
+}
+
+/* ── Form / Winners section ──────────────────────────────────────────────── */
+.form-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+.form-header-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: rgba(255,215,0,0.90);
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+.form-header-sub {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.38);
+  margin: 0;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.form-row--1st {
+  background: linear-gradient(135deg, rgba(255,210,0,0.18) 0%, rgba(200,150,0,0.09) 100%);
+  border-color: rgba(255,210,0,0.42);
+  box-shadow: 0 2px 14px rgba(255,200,0,0.12);
+}
+.form-row--2nd {
+  background: linear-gradient(135deg, rgba(192,192,192,0.14) 0%, rgba(148,148,148,0.07) 100%);
+  border-color: rgba(192,192,192,0.32);
+}
+.form-row--3rd {
+  background: linear-gradient(135deg, rgba(205,127,50,0.13) 0%, rgba(160,100,40,0.06) 100%);
+  border-color: rgba(205,127,50,0.26);
+}
+
+.form-rank-icon {
+  font-size: 1.25rem;
+  text-align: center;
+  line-height: 1;
+}
+
+.form-player-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.form-player-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.form-player-name--you { color: #64D2FF; }
+.form-modes-won {
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.35);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-wins-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.form-wins-count {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255,255,255,0.55);
+}
+.form-wins-label {
+  font-size: 0.60rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.30);
+}
+.form-row--1st .form-wins-count { color: rgba(255,215,0,0.92); }
+.form-row--1st .form-wins-label { color: rgba(255,200,0,0.60); }
+.form-row--2nd .form-wins-count { color: rgba(200,200,200,0.88); }
+.form-row--2nd .form-wins-label { color: rgba(192,192,192,0.55); }
+.form-row--3rd .form-wins-count { color: rgba(205,127,50,0.88); }
+.form-row--3rd .form-wins-label { color: rgba(205,127,50,0.55); }
+
+.form-empty {
+  text-align: center;
+  color: rgba(255,255,255,0.38);
+  font-size: 0.85rem;
+  padding: 32px 0;
+}
+
 /* ── Colour Mode — HSV Picker ────────────────────────────────────────────── */
 
 /*
@@ -5890,4 +6057,131 @@ body {
 .home-friends-btn:active {
   background: rgba(255,255,255,0.14);
   transform: scale(0.96);
+}
+
+/* ── Lobby Podium (TASK 4) ───────────────────────────────────────────────────── */
+.lobby-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 8px 8px;
+}
+.lobby-podium-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 10px 10px 0 0;
+  padding: 12px 10px 8px;
+  min-width: 88px;
+  flex: 1;
+  max-width: 110px;
+  position: relative;
+  overflow: hidden;
+}
+.lobby-podium-slot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+/* ── Podium animations ─────────────────────────────────── */
+@keyframes podiumShimmer {
+  0%   { transform: translateX(-120%); }
+  55%  { transform: translateX(120%); }
+  100% { transform: translateX(120%); }
+}
+@keyframes podiumGlow1st {
+  0%, 100% { box-shadow: 0 0 10px rgba(255,200,0,0.18), inset 0 1px 0 rgba(255,240,100,0.22); }
+  50%       { box-shadow: 0 0 22px rgba(255,200,0,0.38), inset 0 1px 0 rgba(255,240,100,0.30); }
+}
+@keyframes podiumGlow2nd {
+  0%, 100% { box-shadow: 0 0 4px rgba(200,200,200,0.10); }
+  50%       { box-shadow: 0 0 12px rgba(200,200,200,0.22); }
+}
+
+.lobby-podium-slot--1st {
+  height: 120px;
+  background: linear-gradient(160deg, rgba(255,210,0,0.28) 0%, rgba(200,160,0,0.14) 100%);
+  border: 1px solid rgba(255,210,0,0.52);
+  box-shadow: 0 0 14px rgba(255,200,0,0.22), inset 0 1px 0 rgba(255,240,100,0.22);
+  animation: podiumGlow1st 2.6s ease-in-out infinite;
+  order: 2;
+}
+/* Shimmer sweep on 1st place */
+.lobby-podium-slot--1st::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    108deg,
+    transparent 38%,
+    rgba(255,240,160,0.22) 50%,
+    transparent 62%
+  );
+  animation: podiumShimmer 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.lobby-podium-slot--2nd {
+  height: 90px;
+  background: linear-gradient(160deg, rgba(192,192,192,0.22) 0%, rgba(148,148,148,0.10) 100%);
+  border: 1px solid rgba(192,192,192,0.40);
+  box-shadow: 0 0 6px rgba(200,200,200,0.12);
+  animation: podiumGlow2nd 3.2s ease-in-out infinite;
+  order: 1;
+}
+.lobby-podium-slot--3rd {
+  height: 72px;
+  background: linear-gradient(160deg, rgba(205,127,50,0.18) 0%, rgba(160,100,40,0.09) 100%);
+  border: 1px solid rgba(205,127,50,0.30);
+  order: 3;
+}
+.lobby-podium-rank {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.lobby-podium-slot--1st .lobby-podium-rank { color: rgba(255,215,0,0.98); }
+.lobby-podium-slot--2nd .lobby-podium-rank { color: rgba(200,200,200,0.90); }
+.lobby-podium-slot--3rd .lobby-podium-rank { color: rgba(205,127,50,0.85); }
+.lobby-podium-crown {
+  font-size: 1.05rem;
+  margin-bottom: 1px;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(255,200,0,0.55));
+}
+.lobby-podium-crown--silver {
+  filter: drop-shadow(0 2px 5px rgba(192,192,192,0.45));
+}
+.lobby-podium-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.90);
+  text-align: center;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-podium-name--you { color: #64D2FF; }
+.lobby-podium-score {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+  margin-top: 3px;
+  text-align: center;
+}
+
+/* Enhanced podium rows in the list */
+.lobby-challenge-row--podium:first-child {
+  background: rgba(255,210,0,0.06);
+  border-left: 2px solid rgba(255,210,0,0.42);
+  padding-left: 12px;
+}
+.lobby-challenge-row--podium:nth-child(2) {
+  background: rgba(192,192,192,0.04);
+  border-left: 2px solid rgba(192,192,192,0.30);
+  padding-left: 12px;
 }

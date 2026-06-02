@@ -593,6 +593,39 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
     );
   }
 
+  /** Flashy podium: top 2 when ≤3 players, top 3 when >3 players */
+  function renderPodium() {
+    if (challengeLeaderboard.length === 0) return null;
+    const podiumN   = players.length <= 3 ? 2 : 3;
+    const slots     = challengeLeaderboard.slice(0, podiumN);
+    const [p1, p2, p3] = [slots[0], slots[1], slots[2]];
+
+    const slot = (entry: typeof slots[0] | undefined, rank: 1 | 2 | 3) => {
+      if (!entry) return null;
+      const labels  = ['1st', '2nd', '3rd'];
+      const isYou   = entry.player_id === roomCtx.playerId;
+      return (
+        <div className={`lobby-podium-slot lobby-podium-slot--${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'}`}>
+          {rank === 1 && <span className="lobby-podium-crown" aria-hidden="true">👑</span>}
+          {rank === 2 && <span className="lobby-podium-crown lobby-podium-crown--silver" aria-hidden="true">🥈</span>}
+          <span className="lobby-podium-rank">{labels[rank - 1]}</span>
+          <span className={`lobby-podium-name${isYou ? ' lobby-podium-name--you' : ''}`}>
+            {entry.player_name}
+          </span>
+          <span className="lobby-podium-score">{entry.score_label}</span>
+        </div>
+      );
+    };
+
+    return (
+      <div className="lobby-podium">
+        {slot(p2, 2)}
+        {slot(p1, 1)}
+        {podiumN >= 3 && slot(p3, 3)}
+      </div>
+    );
+  }
+
   /** Challenge leaderboard for the active selected_mode */
   function renderChallengeLeaderboard() {
     if (!selectedMode) return null;
@@ -614,18 +647,21 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
             No scores yet — play to get on the board!
           </p>
         ) : (
-          <div className="lobby-challenge-board-list">
-            {challengeLeaderboard.map((s, i) => (
-              <div
-                key={s.id}
-                className={`lobby-challenge-row${s.player_id === roomCtx.playerId ? ' lobby-challenge-row--you' : ''}${i < 3 ? ' lobby-challenge-row--podium' : ''}`}
-              >
-                <span className="lobby-challenge-rank">{rankBadge(i)}</span>
-                <span className="lobby-challenge-player">{s.player_name}</span>
-                <span className="lobby-challenge-score">{s.score_label}</span>
-              </div>
-            ))}
-          </div>
+          <>
+            {renderPodium()}
+            <div className="lobby-challenge-board-list">
+              {challengeLeaderboard.map((s, i) => (
+                <div
+                  key={s.id}
+                  className={`lobby-challenge-row${s.player_id === roomCtx.playerId ? ' lobby-challenge-row--you' : ''}${i < 3 ? ' lobby-challenge-row--podium' : ''}`}
+                >
+                  <span className="lobby-challenge-rank">{rankBadge(i)}</span>
+                  <span className="lobby-challenge-player">{s.player_name}</span>
+                  <span className="lobby-challenge-score">{s.score_label}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     );
@@ -676,7 +712,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
           {isHost ? (
             <>
               <div className="lobby-host-label">
-                <span className="lobby-host-crown">👑</span> You are the host
+                <span className="lobby-host-crown">★</span> You are the host
               </div>
               <p className="room-party-hint">
                 Select a game mode below. Friends see your selection in real time.
@@ -696,7 +732,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
                       onClick={handleStartChallenge}
                       disabled={busy}
                     >
-                      {busy ? 'Starting…' : '🚀 Start Challenge'}
+                      {busy ? 'Starting…' : 'Start Challenge'}
                     </button>
                     <button
                       className="btn-secondary room-party-start-btn"
@@ -797,7 +833,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
             className="lobby-advanced-toggle"
             onClick={() => setShowAdvanced(v => !v)}
           >
-            🔄 Multi-Round Party {showAdvanced ? '▲' : '▼'}
+            Multi-Round Party {showAdvanced ? '▲' : '▼'}
           </button>
           {showAdvanced && (
             <div className="room-party-section" style={{ marginTop: 10 }}>
@@ -879,7 +915,7 @@ export default function RoomLobbyScreen({ roomCtx, onPlayMode, onLeave }: Props)
       {/* Game completed */}
       {gs === 'completed' && (
         <div className="room-party-complete">
-          <p className="room-party-complete-label">🎉 Party game complete!</p>
+          <p className="room-party-complete-label">Party game complete!</p>
           <button
             className="btn-primary room-party-start-btn"
             onClick={() => navigate(`/room/${roomCtx.roomCode}/final`)}

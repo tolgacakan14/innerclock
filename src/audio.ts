@@ -6,8 +6,11 @@
  * Persists the user's on/off preference in localStorage.
  *
  * Tracks:
- *   main  →  /audio/background-loop.mp3   (home, time mode, color mode)
- *   rush  →  /audio/rush-loop.mp3         (rush mode — falls back to main)
+ *   main    →  /audio/background-loop.mp3   (home, lobby, leaderboard)
+ *   rush    →  /audio/rush.mp3              (Rush mode)
+ *   grandma →  /audio/grandma-walk.mp3      (Grandma Walking)
+ *   golf    →  /audio/golf.mp3              (Golf mode)
+ *   time    →  /audio/time-mode.mp3         (Time mode)
  *
  * Usage:
  *   musicManager.toggle()              — flip on/off (with fade)
@@ -16,6 +19,8 @@
  *   musicManager.enabled               — current on/off state
  *   musicManager.currentTrack          — active TrackKey
  *   musicManager.subscribe(fn)         — listen for enabled changes
+ *   musicManager.silence()             — fade out without changing preference
+ *   musicManager.unsilence()           — fade back in if music was enabled
  */
 
 export type TrackKey = 'main' | 'rush' | 'grandma' | 'golf' | 'time';
@@ -25,7 +30,7 @@ const STORAGE_KEY = 'innerclock_music_on';
 /** Audio sources for each track — first match the browser can play wins. */
 const TRACKS: Record<TrackKey, string[]> = {
   main:    ['/audio/background-loop.mp3', '/audio/background-loop.ogg'],
-  rush:    ['/audio/rush-loop.mp3',       '/audio/background-loop.mp3'],
+  rush:    ['/audio/rush.mp3',            '/audio/background-loop.mp3'],
   grandma: ['/audio/grandma-walk.mp3',   '/audio/grandma%20walk.mp3', '/audio/background-loop.mp3'],
   golf:    ['/audio/golf.mp3',            '/audio/background-loop.mp3'],
   time:    ['/audio/time-mode.mp3',       '/audio/background-loop.mp3'],
@@ -42,6 +47,19 @@ class BackgroundMusicManager {
   private _enabled:      boolean;
   private _currentTrack: TrackKey = 'main';
   private listeners      = new Set<(enabled: boolean) => void>();
+
+  /**
+   * Single active fade interval — cleared before any new fade starts.
+   * Prevents two fades fighting over audio.volume simultaneously.
+   */
+  private _fadeId: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Generation counter — incremented on every setTrack() call.
+   * A fade-out callback checks this before starting a fade-in so that
+   * stale callbacks from superseded track switches are silently dropped.
+   */
+  private _fadeGen = 0;
 
   constructor() {
     this._enabled = localStorage.getItem(STORAGE_KEY) !== 'false';
@@ -68,8 +86,8 @@ class BackgroundMusicManager {
             `[InnerClock] ⚠  Music file not found for track "${this._currentTrack}".\n` +
             '  Place royalty-free loops at:\n' +
             '    public/audio/background-loop.mp3  (main track)\n' +
-            '    public/audio/rush-loop.mp3         (rush track)\n' +
-            '  If rush-loop.mp3 is absent, the main track will be used instead.',
+            '    public/audio/rush.mp3               (rush track)\n' +
+            '  If rush.mp3 is absent, the main track will be used instead.',
           );
         }
       });
@@ -107,7 +125,11 @@ class BackgroundMusicManager {
   /**
    * Switch to a different track.
    *
-   * If music is ON: fade out → swap sources → fade in (cross-fade ~360 ms each).
+   * If music is ON: cancel any running fade, then fade out → swap sources →
+   * fade in.  A generation counter ensures that if setTrack() is called again
+   * before the fade-out finishes, the stale callback is dropped — preventing
+   * two tracks from playing simultaneously.
+   *
    * If music is OFF: swap sources silently so the next play() uses the new track.
    * No-op if the requested track is already active.
    */
@@ -124,13 +146,32 @@ class BackgroundMusicManager {
       return;
     }
 
-    // Cross-fade: fade out → load new sources → fade in
+    // Bump generation so any in-flight fade-out callback is invalidated
+    const gen = ++this._fadeGen;
+
     this._fadeOutThen(() => {
+      // Guard: a newer setTrack() was called while we were fading out
+      if (gen !== this._fadeGen) return;
       if (!this.audio) return;
       this._applySources(TRACKS[key]);
       this.audio.load();
       this._fadeIn();
     });
+  }
+
+  /**
+   * Temporarily fade out music without changing the on/off preference.
+   * Call unsilence() to restore when the silent context is over.
+   */
+  silence(): void {
+    this._fadeOutThen(() => {}); // fade out; leave currentTime intact for resume
+  }
+
+  /**
+   * Restore music after silence() — resumes only if music was enabled.
+   */
+  unsilence(): void {
+    if (this._enabled) this._fadeIn();
   }
 
   /**
@@ -143,6 +184,14 @@ class BackgroundMusicManager {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  /** Cancel any running fade interval. Must be called before starting a new one. */
+  private _clearFade(): void {
+    if (this._fadeId !== null) {
+      clearInterval(this._fadeId);
+      this._fadeId = null;
+    }
+  }
 
   private _applySources(sources: string[]): void {
     if (!this.audio) return;
@@ -158,15 +207,16 @@ class BackgroundMusicManager {
   }
 
   private _fadeIn(): void {
+    this._clearFade();          // cancel any running fade before starting
     if (!this.audio) return;
     this.audio.volume = 0;
     this.audio.play().catch(() => {});
     let step = 0;
-    const id = setInterval(() => {
-      if (!this.audio) { clearInterval(id); return; }
+    this._fadeId = setInterval(() => {
+      if (!this.audio) { this._clearFade(); return; }
       step++;
       this.audio.volume = Math.min(DEFAULT_VOLUME, (step / FADE_STEPS) * DEFAULT_VOLUME);
-      if (step >= FADE_STEPS) clearInterval(id);
+      if (step >= FADE_STEPS) this._clearFade();
     }, FADE_INTERVAL);
   }
 
@@ -178,21 +228,22 @@ class BackgroundMusicManager {
   }
 
   /**
-   * Fade out then run `callback` when the audio is fully silent.
-   * Used internally for both toggle-off and track switching.
+   * Cancel any in-flight fade, then fade out and call `callback` once silent.
+   * If audio is already paused, calls `callback` synchronously.
    */
   private _fadeOutThen(callback: () => void): void {
+    this._clearFade();          // cancel any running fade before starting
     if (!this.audio) { callback(); return; }
     if (this.audio.paused) { callback(); return; }
 
     const startVol = this.audio.volume;
     let step = 0;
-    const id = setInterval(() => {
-      if (!this.audio) { clearInterval(id); callback(); return; }
+    this._fadeId = setInterval(() => {
+      if (!this.audio) { this._clearFade(); callback(); return; }
       step++;
       this.audio.volume = Math.max(0, startVol * (1 - step / FADE_STEPS));
       if (step >= FADE_STEPS) {
-        clearInterval(id);
+        this._clearFade();
         this.audio.pause();
         callback();
       }

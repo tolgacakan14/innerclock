@@ -12,8 +12,6 @@ const FRICTION   = 0.982;
 const BOUNCE     = 0.86;   // slightly more elastic than before
 const MAX_SPEED  = 18;
 const MAX_DRAG   = 140;
-const BALL_TAP_R = 50;
-
 // ── Course inner boundaries (green surface rect: x=30,y=44,w=540,h=830) ──────
 const COURSE_L = 30 + BALL_R + 1;   // left wall inner edge
 const COURSE_R = 570 - BALL_R - 1;  // right wall inner edge
@@ -162,33 +160,7 @@ interface Props {
   onHome:      () => void;
 }
 
-// ── Golf swing sound ──────────────────────────────────────────────────────────
-function playGolfSwing(power: number) {
-  try {
-    const ctx = new (window.AudioContext ?? (window as any).webkitAudioContext)();
-    // Whoosh: noise burst filtered to a swish
-    const bufLen = Math.floor(ctx.sampleRate * 0.18);
-    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-    const data   = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
-    }
-    const src    = ctx.createBufferSource();
-    src.buffer   = buf;
-    const filter = ctx.createBiquadFilter();
-    filter.type  = 'bandpass';
-    filter.frequency.value = 900 + power * 800;
-    filter.Q.value = 1.4;
-    const gain   = ctx.createGain();
-    gain.gain.setValueAtTime(0.35 + power * 0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
-    src.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-    src.start();
-    src.onended = () => ctx.close();
-  } catch { /* silent */ }
-}
+const AUDIO_STORAGE_KEY = 'innerclock_music_on';
 
 export default function GolfGameScreen({ course, courseIndex, onComplete, onHome }: Props) {
   const svgRef    = useRef<SVGSVGElement>(null);
@@ -200,6 +172,49 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   const sunkRef       = useRef(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  function getAudioCtx(): AudioContext | null {
+    if (localStorage.getItem(AUDIO_STORAGE_KEY) === 'false') return null;
+    if (!audioCtxRef.current) {
+      try {
+        audioCtxRef.current = new (window.AudioContext ?? (window as any).webkitAudioContext)();
+      } catch { return null; }
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+    return audioCtxRef.current;
+  }
+  function playGolfSwing(power: number) {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+      const bufLen = Math.floor(ctx.sampleRate * 0.18);
+      const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const data   = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+      }
+      const src    = ctx.createBufferSource();
+      src.buffer   = buf;
+      const filter = ctx.createBiquadFilter();
+      filter.type  = 'bandpass';
+      filter.frequency.value = 900 + power * 800;
+      filter.Q.value = 1.4;
+      const gain   = ctx.createGain();
+      gain.gain.setValueAtTime(0.35 + power * 0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      src.start();
+    } catch { /* silent */ }
+  }
+  useEffect(() => {
+    return () => { audioCtxRef.current?.close().catch(() => {}); };
+  }, []);
 
   // ── Rolling state ─────────────────────────────────────────────────────────
   const rollAngleRef   = useRef(0);
@@ -327,12 +342,11 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     svgRectRef.current = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
     const pt = toSVGPoint(e.clientX, e.clientY);
     if (!pt) return;
-    const b = ballRef.current;
-    if (Math.hypot(pt.x - b.x, pt.y - b.y) > BALL_TAP_R) return;
     phaseRef.current = 'aiming';
     setPhase('aiming');
 
-    // Compute edge-aware zoom scale and transform-origin
+    // Compute edge-aware zoom scale and transform-origin based on ball position
+    const b = ballRef.current;
     const params = computeAimParams(b.x, b.y);
     setAimScale(params.scale);
     setAimOrigin({ x: params.originX, y: params.originY });

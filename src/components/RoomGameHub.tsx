@@ -165,7 +165,7 @@ export default function RoomGameHub() {
   if (view === 'not-found') {
     return (
       <div className="screen room-notfound-screen">
-        <span className="room-notfound-icon">🔍</span>
+        <span className="room-notfound-icon">!</span>
         <h2 className="room-notfound-title">Room not found</h2>
         <p className="room-notfound-sub">
           The code <strong>{normalizedCode}</strong> doesn't match any active room.

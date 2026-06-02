@@ -16,8 +16,15 @@ interface Props {
 }
 
 export default function ColorGame({ playerName, onExit, roomContext }: Props) {
-  const [screen,           setScreen]           = useState<ColorScreen>('start');
-  const [targets,          setTargets]          = useState<TargetColor[]>([]);
+  // In room mode: skip start screen, generate targets immediately
+  const [targets, setTargets] = useState<TargetColor[]>(() => {
+    if (roomContext) {
+      const rng = makeGameRng(roomContext, 'color');
+      return generateDiverseColorSet(5, rng);
+    }
+    return [];
+  });
+  const [screen,           setScreen]           = useState<ColorScreen>(roomContext ? 'observe' : 'start');
   const [rounds,           setRounds]           = useState<ColorRound[]>([]);
   const [currentRound,     setCurrentRound]     = useState(0);
   const [pendingSelected,  setPendingSelected]  = useState<TargetColor>({ h: 180, s: 60, l: 50 });

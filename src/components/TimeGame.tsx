@@ -21,8 +21,15 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack } = useBackgroundMusic();
   useEffect(() => { setTrack('time'); }, []);
 
-  const [screen,        setScreen]        = useState<TimeScreen>('start');
-  const [targets,       setTargets]       = useState<number[]>([]);
+  // In room mode skip the start screen — generate targets immediately
+  const [targets, setTargets] = useState<number[]>(() => {
+    if (roomContext) {
+      const rng = makeGameRng(roomContext, 'time');
+      return Array.from({ length: 5 }, () => randomTarget(rng));
+    }
+    return [];
+  });
+  const [screen,        setScreen]        = useState<TimeScreen>(roomContext ? 'countdown' : 'start');
   const [rounds,        setRounds]        = useState<Round[]>([]);
   const [currentRound,  setCurrentRound]  = useState(0);
   const [pendingActual, setPendingActual] = useState(0);

@@ -153,7 +153,7 @@ export default function RoomFinalScreen({ roomCtx: propCtx, onBackToLobby }: Pro
   if (!ctx) {
     return (
       <div className="screen room-notfound-screen">
-        <span className="room-notfound-icon">🔍</span>
+        <span className="room-notfound-icon">!</span>
         <h2 className="room-notfound-title">Room not found</h2>
         <button className="btn-primary" onClick={() => navigate('/')}>← Home</button>
       </div>
@@ -255,7 +255,7 @@ export default function RoomFinalScreen({ roomCtx: propCtx, onBackToLobby }: Pro
           className="btn-primary"
           onClick={handleCopyResults}
         >
-          {copyDone ? '✓ Copied!' : '📋 Copy Results'}
+          {copyDone ? '✓ Copied!' : 'Copy Results'}
         </button>
         <button className="btn-ghost" onClick={handleBack}>
           ← Back to Lobby

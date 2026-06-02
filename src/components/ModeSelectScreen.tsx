@@ -199,53 +199,55 @@ function GrandmaGraphic() {
 }
 
 function SequenceGraphic() {
-  // 3×2 grid — first 3 tiles are "lit" in the sequence, last 3 are dim
+  // 3×2 grid — tiles 0, 2, 4 are lit in sequence (steps 1→2→3)
   const COLORS = ['#FF453A','#FF9F0A','#30D158','#5AC8F5','#BF5AF2','#FFD60A'];
-  const LIT    = [0, 2, 4];  // tiles currently in the sequence (shown as step 1-2-3)
+  const LIT    = [0, 2, 4];
   const litOrder = [1, 2, 3];
 
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      {/* Dark field with radial glow */}
-      <rect x="0" y="0" width="100" height="100" fill="#08071A"/>
-      <radialGradient id="seqGlow" cx="50%" cy="48%" r="52%">
-        <stop offset="0%" stopColor="rgba(255,159,10,0.14)"/>
-        <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
-      </radialGradient>
+      <rect x="0" y="0" width="100" height="100" fill="#07061A"/>
+      <defs>
+        <radialGradient id="seqGlow" cx="50%" cy="45%" r="54%">
+          <stop offset="0%" stopColor="rgba(191,90,242,0.18)"/>
+          <stop offset="60%" stopColor="rgba(255,159,10,0.08)"/>
+          <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+        </radialGradient>
+      </defs>
       <rect x="0" y="0" width="100" height="100" fill="url(#seqGlow)"/>
 
-      {/* 3×2 tiles */}
+      {/* 3×2 tiles — 26px each, 5px gap, starting x=7 */}
       {[0,1,2].map(col => [0,1].map(row => {
         const i   = row * 3 + col;
-        const x   = 9 + col * 28;
-        const y   = 18 + row * 30;
+        const x   = 7  + col * 31;
+        const y   = 13 + row * 36;
         const lit = LIT.includes(i);
         const seq = lit ? litOrder[LIT.indexOf(i)] : null;
         const c   = COLORS[i];
 
         return (
           <g key={i}>
-            {/* Glow halo for lit tiles */}
+            {/* Wide glow halo */}
             {lit && (
-              <rect x={x-3} y={y-3} width={28} height={28} rx="9"
-                fill={c} opacity="0.18"/>
+              <rect x={x-5} y={y-5} width={36} height={36} rx="11"
+                fill={c} opacity="0.22"/>
             )}
-            {/* Tile body */}
-            <rect x={x} y={y} width={22} height={22} rx="6"
+            {/* Tile */}
+            <rect x={x} y={y} width={26} height={26} rx="7"
               fill={lit ? c : 'rgba(255,255,255,0.055)'}
               stroke={lit ? c : 'rgba(255,255,255,0.10)'}
               strokeWidth={lit ? 0 : 1}
-              opacity={lit ? 0.90 : 1}
+              opacity={lit ? 0.93 : 1}
             />
-            {/* Inner shine on lit tile */}
+            {/* Inner shine */}
             {lit && (
-              <rect x={x+2} y={y+2} width={18} height={7} rx="3"
-                fill="rgba(255,255,255,0.22)"/>
+              <rect x={x+2} y={y+2} width={22} height={8} rx="4"
+                fill="rgba(255,255,255,0.30)"/>
             )}
             {/* Sequence number */}
             {seq !== null && (
-              <text x={x+11} y={y+15.5} textAnchor="middle"
-                fill="rgba(255,255,255,0.95)" fontSize="10" fontWeight="800"
+              <text x={x+13} y={y+19} textAnchor="middle"
+                fill="rgba(255,255,255,0.98)" fontSize="12" fontWeight="800"
                 fontFamily="system-ui,-apple-system,sans-serif">
                 {seq}
               </text>
@@ -254,19 +256,19 @@ function SequenceGraphic() {
         );
       }))}
 
-      {/* Connecting dashes between step 1→2→3 */}
-      <line x1="31" y1="29" x2="38" y2="44" stroke="rgba(255,255,255,0.25)" strokeWidth="1.2" strokeDasharray="2.5 2"/>
-      <line x1="53" y1="44" x2="66" y2="29" stroke="rgba(255,255,255,0.25)" strokeWidth="1.2" strokeDasharray="2.5 2"/>
+      {/* Connecting dashes: step 1 (col0,row0) → step 2 (col2,row0) → step 3 (col1,row1) */}
+      {/* Step1 center: (7+13=20, 13+13=26). Step2 center: (69+13=82, 26). Step3 center: (38+13=51, 49+13=62) */}
+      <line x1="33" y1="26" x2="69" y2="26" stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" strokeDasharray="3 2.5"/>
+      <line x1="82" y1="34" x2="57" y2="56" stroke="rgba(255,255,255,0.28)" strokeWidth="1.2" strokeDasharray="3 2.5"/>
 
-      {/* "…" hint */}
-      <text x="50" y="86" textAnchor="middle"
-        fill="rgba(255,159,10,0.65)" fontSize="7.5" fontWeight="700"
-        fontFamily="system-ui,-apple-system,sans-serif"
-        letterSpacing="3">
+      {/* Hint dots */}
+      <text x="50" y="82" textAnchor="middle"
+        fill="rgba(191,90,242,0.72)" fontSize="8" fontWeight="700"
+        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="4">
         · · ·
       </text>
-      <text x="50" y="96" textAnchor="middle"
-        fill="rgba(255,255,255,0.28)" fontSize="6.5"
+      <text x="50" y="93" textAnchor="middle"
+        fill="rgba(255,255,255,0.28)" fontSize="6"
         fontFamily="system-ui,-apple-system,sans-serif">
         Watch · Repeat
       </text>
@@ -275,53 +277,39 @@ function SequenceGraphic() {
 }
 
 function MemoryGridGraphic() {
-  // 4×4 grid — 5 cells are "lit" (the ones to memorise)
-  const LIT = new Set([1, 5, 6, 10, 14]);
+  const LIT = new Set([1, 3, 5, 7]);
 
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      {/* Background with blue tint */}
-      <rect x="0" y="0" width="100" height="100" fill="#060D1C"/>
-      <radialGradient id="memGlow" cx="50%" cy="45%" r="50%">
-        <stop offset="0%" stopColor="rgba(90,200,245,0.12)"/>
-        <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
-      </radialGradient>
+      <rect x="0" y="0" width="100" height="100" fill="#050E1C"/>
+      <defs>
+        <radialGradient id="memGlow" cx="50%" cy="46%" r="50%">
+          <stop offset="0%" stopColor="rgba(90,200,245,0.16)"/>
+          <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+        </radialGradient>
+      </defs>
       <rect x="0" y="0" width="100" height="100" fill="url(#memGlow)"/>
 
-      {/* 4×4 grid */}
-      {Array.from({length: 16}, (_, i) => {
-        const row = Math.floor(i / 4);
-        const col = i % 4;
+      {/* 3×3 grid — 26px cells, 5px gap */}
+      {Array.from({length: 9}, (_, i) => {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
         const lit = LIT.has(i);
-        const x   = 8 + col * 22;
-        const y   = 10 + row * 22;
+        const x   = 9 + col * 31;
+        const y   = 9 + row * 31;
         return (
-          <g key={i}>
-            {lit && (
-              <rect x={x-2} y={y-2} width={22} height={22} rx="6"
-                fill="rgba(90,200,245,0.18)"/>
-            )}
-            <rect x={x} y={y} width={18} height={18} rx="4"
-              fill={lit ? 'rgba(90,200,245,0.78)' : 'rgba(255,255,255,0.055)'}
-              stroke={lit ? 'rgba(90,200,245,0.90)' : 'rgba(255,255,255,0.09)'}
-              strokeWidth="1"
-            />
-            {lit && (
-              <rect x={x+1} y={y+1} width={16} height={6} rx="2"
-                fill="rgba(255,255,255,0.24)"/>
-            )}
-          </g>
+          <rect key={i} x={x} y={y} width={26} height={26} rx="5"
+            fill={lit ? 'rgba(90,200,245,0.80)' : 'rgba(255,255,255,0.055)'}
+            stroke={lit ? 'rgba(90,200,245,0.90)' : 'rgba(255,255,255,0.09)'}
+            strokeWidth="1"
+          />
         );
       })}
 
-      {/* Flash overlay effect on lit cells */}
-      <rect x="0" y="0" width="100" height="100" fill="rgba(90,200,245,0.03)"/>
-
-      {/* Bottom label */}
-      <text x="50" y="96" textAnchor="middle"
+      {/* Label */}
+      <text x="50" y="97" textAnchor="middle"
         fill="rgba(90,200,245,0.55)" fontSize="6.5" fontWeight="600"
-        fontFamily="system-ui,-apple-system,sans-serif"
-        letterSpacing="0.5">
+        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.5">
         REMEMBER · RECALL
       </text>
     </svg>
@@ -329,78 +317,52 @@ function MemoryGridGraphic() {
 }
 
 function TapTimingGraphic() {
-  // Marker sitting just inside the perfect zone, about to reach center
-  const markerX = 54;
-
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      {/* Background with green glow */}
       <rect x="0" y="0" width="100" height="100" fill="#050D0A"/>
-      <radialGradient id="ttGlow" cx="50%" cy="52%" r="40%">
-        <stop offset="0%" stopColor="rgba(48,209,88,0.14)"/>
-        <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
-      </radialGradient>
+      <defs>
+        <radialGradient id="ttGlow" cx="50%" cy="50%" r="40%">
+          <stop offset="0%" stopColor="rgba(48,209,88,0.18)"/>
+          <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+        </radialGradient>
+      </defs>
       <rect x="0" y="0" width="100" height="100" fill="url(#ttGlow)"/>
 
-      {/* ── Score / combo hint at top ── */}
-      <text x="50" y="22" textAnchor="middle"
-        fill="rgba(255,214,10,0.80)" fontSize="11" fontWeight="800"
-        fontFamily="system-ui,-apple-system,sans-serif"
-        letterSpacing="-0.5">
-        x3 COMBO
-      </text>
-      <text x="50" y="33" textAnchor="middle"
-        fill="rgba(48,209,88,0.70)" fontSize="7.5" fontWeight="700"
-        fontFamily="system-ui,-apple-system,sans-serif">
-        +30 pts
-      </text>
+      {/* Bar track */}
+      <rect x="8" y="44" width="84" height="14" rx="7"
+        fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.10)" strokeWidth="0.8"/>
+      {/* Good zone */}
+      <rect x="20" y="44" width="60" height="14" rx="6"
+        fill="rgba(255,159,10,0.22)"/>
+      {/* Perfect zone */}
+      <rect x="36" y="44" width="28" height="14" rx="5"
+        fill="rgba(48,209,88,0.45)"/>
 
-      {/* ── Timing bar ── */}
-      {/* Bar background */}
-      <rect x="6" y="44" width="88" height="16" rx="8" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.10)" strokeWidth="0.8"/>
-      {/* Good zone (amber) */}
-      <rect x="18" y="44" width="64" height="16" rx="7" fill="rgba(255,159,10,0.20)"/>
-      {/* Perfect zone (green) */}
-      <rect x="35" y="44" width="30" height="16" rx="6" fill="rgba(48,209,88,0.35)"/>
-      {/* Perfect zone inner glow */}
-      <rect x="36" y="45" width="28" height={6} rx="3" fill="rgba(48,209,88,0.22)"/>
+      {/* Center tick */}
+      <line x1="50" y1="39" x2="50" y2="62"
+        stroke="rgba(48,209,88,0.70)" strokeWidth="1.4" strokeLinecap="round"/>
 
-      {/* Center guide line */}
-      <line x1="50" y1="40" x2="50" y2="64"
-        stroke="rgba(48,209,88,0.60)" strokeWidth="1.5" strokeLinecap="round"/>
-
-      {/* Marker shadow */}
-      <ellipse cx={markerX} cy="66" rx="6" ry="2.5" fill="rgba(0,0,0,0.35)"/>
-      {/* Marker body */}
-      <circle cx={markerX} cy="52" r="7.5"
+      {/* Marker — just inside perfect zone, about to hit center */}
+      <circle cx="54" cy="51" r="7"
         fill="white"
-        style={{ filter: 'drop-shadow(0 0 5px rgba(48,209,88,0.70))' }}
+        style={{ filter: 'drop-shadow(0 0 5px rgba(48,209,88,0.75))' }}
       />
-      {/* Marker inner ring */}
-      <circle cx={markerX} cy="52" r="4" fill="rgba(48,209,88,0.80)"/>
 
       {/* Zone labels */}
-      <text x="28" y="74" textAnchor="middle"
-        fill="rgba(255,159,10,0.65)" fontSize="5.5" fontWeight="600"
-        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.3">
-        GOOD
-      </text>
-      <text x="50" y="74" textAnchor="middle"
-        fill="rgba(48,209,88,0.80)" fontSize="5.5" fontWeight="700"
-        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.3">
+      <text x="50" y="73" textAnchor="middle"
+        fill="rgba(48,209,88,0.75)" fontSize="6" fontWeight="700"
+        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.5">
         PERFECT
       </text>
-      <text x="72" y="74" textAnchor="middle"
-        fill="rgba(255,159,10,0.65)" fontSize="5.5" fontWeight="600"
-        fontFamily="system-ui,-apple-system,sans-serif" letterSpacing="0.3">
+      <text x="22" y="73" textAnchor="middle"
+        fill="rgba(255,159,10,0.55)" fontSize="5.5" fontWeight="600"
+        fontFamily="system-ui,-apple-system,sans-serif">
         GOOD
       </text>
-
-      {/* Tap cue */}
-      <text x="50" y="92" textAnchor="middle"
-        fill="rgba(255,255,255,0.30)" fontSize="6.5"
+      <text x="78" y="73" textAnchor="middle"
+        fill="rgba(255,159,10,0.55)" fontSize="5.5" fontWeight="600"
         fontFamily="system-ui,-apple-system,sans-serif">
-        Tap at the perfect moment
+        GOOD
       </text>
     </svg>
   );
@@ -409,33 +371,58 @@ function TapTimingGraphic() {
 function ArrowEscapeGraphic() {
   return (
     <svg viewBox="0 0 100 100" fill="none" aria-hidden="true" className="home-card-svg">
-      <rect x="0" y="0" width="100" height="100" fill="#060C1E"/>
-      {/* 4×4 grid lines */}
-      {[28,46,64,82].map(v => (
+      <rect x="0" y="0" width="100" height="100" fill="#070B1E"/>
+      <defs>
+        <radialGradient id="aeGlow" cx="50%" cy="50%" r="55%">
+          <stop offset="0%" stopColor="rgba(0,212,255,0.20)"/>
+          <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="100" height="100" fill="url(#aeGlow)"/>
+
+      {/* Subtle 3×3 grid lines */}
+      {[33, 67].map(v => (
         <g key={v}>
-          <line x1={v} y1="14" x2={v} y2="86" stroke="rgba(255,255,255,0.07)" strokeWidth="0.8"/>
-          <line x1="14" y1={v} x2="86" y2={v} stroke="rgba(255,255,255,0.07)" strokeWidth="0.8"/>
+          <line x1={v} y1="9" x2={v} y2="91" stroke="rgba(255,255,255,0.055)" strokeWidth="0.7"/>
+          <line x1="9" y1={v} x2="91" y2={v} stroke="rgba(255,255,255,0.055)" strokeWidth="0.7"/>
         </g>
       ))}
-      {/* Arrow tiles */}
-      <rect x="15" y="47" width="17" height="17" rx="3" fill="rgba(0,212,255,0.14)" stroke="rgba(0,212,255,0.65)" strokeWidth="1"/>
-      <path d="M21 55.5 L28 55.5 M25.5 52.5 L28 55.5 L25.5 58.5" stroke="#00D4FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="9" y="9" width="82" height="82" rx="5" stroke="rgba(255,255,255,0.06)" strokeWidth="0.7" fill="none"/>
 
-      <rect x="47" y="15" width="17" height="17" rx="3" fill="rgba(48,209,88,0.14)" stroke="rgba(48,209,88,0.65)" strokeWidth="1"/>
-      <path d="M55.5 21 L55.5 28 M52.5 25.5 L55.5 28 L58.5 25.5" stroke="#30D158" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Corner tiles — dim */}
+      {[[11,11],[67,11],[11,67],[67,67]].map(([x,y]) => (
+        <rect key={`${x}${y}`} x={x} y={y} width="20" height="20" rx="4"
+          fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.09)" strokeWidth="0.8"/>
+      ))}
 
-      <rect x="65" y="47" width="17" height="17" rx="3" fill="rgba(255,214,10,0.14)" stroke="rgba(255,214,10,0.65)" strokeWidth="1"/>
-      <path d="M71 55.5 L78 55.5 M75.5 52.5 L78 55.5 L75.5 58.5" stroke="#FFD60A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* UP — green */}
+      <rect x="37" y="11" width="26" height="26" rx="5" fill="rgba(48,209,88,0.20)" stroke="rgba(48,209,88,0.80)" strokeWidth="1.3"/>
+      <line x1="50" y1="32" x2="50" y2="16" stroke="#30D158" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M44.5 21.5 L50 16 L55.5 21.5" stroke="#30D158" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
 
-      <rect x="33" y="65" width="17" height="17" rx="3" fill="rgba(255,55,95,0.14)" stroke="rgba(255,55,95,0.65)" strokeWidth="1"/>
-      <path d="M41.5 71 L41.5 78 M38.5 75.5 L41.5 78 L44.5 75.5" stroke="#FF375F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* LEFT — yellow */}
+      <rect x="11" y="37" width="26" height="26" rx="5" fill="rgba(255,214,10,0.20)" stroke="rgba(255,214,10,0.78)" strokeWidth="1.3"/>
+      <line x1="32" y1="50" x2="16" y2="50" stroke="#FFD60A" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M21.5 44.5 L16 50 L21.5 55.5" stroke="#FFD60A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
 
-      {/* Escape trail — cyan arrow sliding right */}
-      <line x1="83" y1="55.5" x2="96" y2="55.5" stroke="rgba(0,212,255,0.55)" strokeWidth="1.5" strokeDasharray="3 2"/>
-      <path d="M94 52.5 L98 55.5 L94 58.5" fill="rgba(0,212,255,0.80)"/>
+      {/* RIGHT — cyan (highlighted escape route) */}
+      <rect x="63" y="37" width="26" height="26" rx="5" fill="rgba(0,212,255,0.28)" stroke="rgba(0,212,255,0.95)" strokeWidth="1.6"/>
+      <line x1="68" y1="50" x2="84" y2="50" stroke="#00D4FF" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M78.5 44.5 L84 50 L78.5 55.5" stroke="#00D4FF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
 
-      {/* +10 score pop */}
-      <text x="87" y="48" fill="#30D158" fontSize="7.5" fontWeight="800" opacity="0.90">+10</text>
+      {/* DOWN — pink */}
+      <rect x="37" y="63" width="26" height="26" rx="5" fill="rgba(255,55,95,0.20)" stroke="rgba(255,55,95,0.78)" strokeWidth="1.3"/>
+      <line x1="50" y1="68" x2="50" y2="84" stroke="#FF375F" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M44.5 78.5 L50 84 L55.5 78.5" stroke="#FF375F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+
+      {/* CENTER — player piece */}
+      <rect x="37" y="37" width="26" height="26" rx="6" fill="rgba(255,255,255,0.11)" stroke="rgba(255,255,255,0.42)" strokeWidth="1.6"/>
+      <circle cx="50" cy="50" r="6" fill="rgba(255,255,255,0.95)"/>
+      <circle cx="50" cy="50" r="2.8" fill="#070B1E"/>
+
+      {/* Score pop */}
+      <text x="91" y="30" fill="rgba(0,212,255,0.92)" fontSize="7.5" fontWeight="800"
+        textAnchor="end" fontFamily="system-ui,-apple-system,sans-serif">+10</text>
     </svg>
   );
 }

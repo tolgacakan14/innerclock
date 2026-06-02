@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBackgroundMusic }   from '../hooks/useBackgroundMusic';
 import RushIntroScreen          from './RushIntroScreen';
 import RushCountdownScreen      from './RushCountdownScreen';
@@ -16,7 +16,10 @@ interface Props {
 
 export default function RushGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }                = useBackgroundMusic();
-  const [screen,          setScreen]          = useState<RushScreen>('intro');
+  // In room mode: skip intro + pre-game countdown → go straight to playing
+  const [screen,          setScreen]          = useState<RushScreen>(roomContext ? 'playing' : 'intro');
+  // Set rush music immediately if starting in room mode (no handleStart called)
+  useEffect(() => { if (roomContext) setTrack('rush'); }, []);
   const [finalScore,      setFinalScore]      = useState(0);
   const [finalNormalHits, setFinalNormalHits] = useState(0);
   const [finalRushHits,   setFinalRushHits]   = useState(0);

@@ -4,15 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 
 interface RoundConfig { gridSize: number; cells: number; previewMs: number; }
 
-// 45 round configs covering 5 escalating phases.
-// After round 45 the last config repeats (see getConfig).
-//
-//  Phase 1 — Rounds  1– 3: 3×3 intro       (3 entries)
-//  Phase 2 — Rounds  4– 7: 4×4 warm-up     (4 entries)
-//  Phase 3 — Rounds  8–17: 5×5 intermediate (10 entries)
-//  Phase 4 — Rounds 18–28: 6×6 advanced    (11 entries)
-//  Phase 5 — Rounds 29–38: 7×7 hard        (10 entries)
-//  Phase 6 — Rounds 39–45: 8×8 expert      ( 7 entries)
 const ROUND_CONFIGS: RoundConfig[] = [
   // ── Phase 1: 3×3 ─────────────────────────────────────────────────────────
   { gridSize: 3, cells: 3, previewMs: 1500 },  // 1
@@ -49,44 +40,27 @@ const ROUND_CONFIGS: RoundConfig[] = [
   // ── Phase 5: 7×7 ─────────────────────────────────────────────────────────
   { gridSize: 7, cells: 16, previewMs: 580 },  // 29
   { gridSize: 7, cells: 17, previewMs: 560 },  // 30
-  { gridSize: 7, cells: 18, previewMs: 540 },  // 31
-  { gridSize: 7, cells: 19, previewMs: 520 },  // 32
-  { gridSize: 7, cells: 20, previewMs: 500 },  // 33
-  { gridSize: 7, cells: 22, previewMs: 480 },  // 34
-  { gridSize: 7, cells: 24, previewMs: 460 },  // 35
-  { gridSize: 7, cells: 26, previewMs: 440 },  // 36
-  { gridSize: 7, cells: 28, previewMs: 420 },  // 37
-  { gridSize: 7, cells: 30, previewMs: 400 },  // 38
-  // ── Phase 6: 8×8 ─────────────────────────────────────────────────────────
-  { gridSize: 8, cells: 20, previewMs: 480 },  // 39
-  { gridSize: 8, cells: 22, previewMs: 460 },  // 40
-  { gridSize: 8, cells: 24, previewMs: 440 },  // 41
-  { gridSize: 8, cells: 26, previewMs: 420 },  // 42
-  { gridSize: 8, cells: 28, previewMs: 400 },  // 43
-  { gridSize: 8, cells: 30, previewMs: 380 },  // 44
-  { gridSize: 8, cells: 32, previewMs: 360 },  // 45+
 ];
 
 function getConfig(round: number): RoundConfig {
   return ROUND_CONFIGS[Math.min(round - 1, ROUND_CONFIGS.length - 1)];
 }
 
-/** Pick `count` random cell indices from a gridSize×gridSize grid. */
+/** Fisher-Yates shuffle → returns `count` unique indices from [0, gridSize²). */
 function pickCells(gridSize: number, count: number): Set<number> {
   const total   = gridSize * gridSize;
-  // Guard: never request more cells than available
-  const safeCount = Math.min(count, total);
+  const safeN   = Math.min(count, total);
   const indices = Array.from({ length: total }, (_, i) => i);
   for (let i = total - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
-  return new Set(indices.slice(0, safeCount));
+  return new Set(indices.slice(0, safeN));
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Phase = 'ready' | 'preview' | 'selecting' | 'feedback';
+type Phase = 'idle' | 'preview' | 'input' | 'result';
 
 interface Props {
   onComplete: (completedRounds: number, totalCorrectCells: number, score: number) => void;
@@ -96,27 +70,34 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function MemoryGridGameScreen({ onComplete, onHome }: Props) {
-  // ── React state — drives rendering only ──────────────────────────────────
-  const [round,         setRound]         = useState(1);
-  const [phase,         setPhase]         = useState<Phase>('ready');
-  const [targetCells,   setTargetCells]   = useState<Set<number>>(new Set());
-  const [selectedCells, setSelectedCells] = useState<Set<number>>(new Set());
-  const [allCorrect,    setAllCorrect]    = useState(false);
 
-  // ── Refs — authoritative mutable game state, no stale-closure risk ────────
-  const phaseRef         = useRef<Phase>('ready');
-  const targetCellsRef   = useRef<Set<number>>(new Set());
-  const selectedCellsRef = useRef<Set<number>>(new Set());
-  const roundRef         = useRef(1);
+  // ── React state (drives rendering) ───────────────────────────────────────
+  const [round,       setRound]      = useState(1);
+  const [phase,       setPhase]      = useState<Phase>('idle');
+  const [targets,     setTargets]    = useState<Set<number>>(new Set());
+  const [selected,    setSelected]   = useState<Set<number>>(new Set());
+  const [lastCorrect, setLastCorrect] = useState(false);
 
+  // ── Authoritative refs (no stale-closure risk) ────────────────────────────
+  const phaseRef    = useRef<Phase>('idle');
+  const roundRef    = useRef(1);
+  const targetsRef  = useRef<Set<number>>(new Set());
+  const selectedRef = useRef<Set<number>>(new Set());
+
+  // Single timer slot — always cleared before a new timer is set.
+  // This replaces the old roundIdRef pattern and is simpler + equally safe.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Scoring
   const completedRef    = useRef(0);
   const totalCorrectRef = useRef(0);
-  const doneRef         = useRef(false);
-  const timersRef       = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const onCompleteRef   = useRef(onComplete);
+
+  // Lifecycle flag — set to true in cleanup to stop any in-flight callbacks
+  const doneRef       = useRef(false);
+  const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  // ── Web Audio ─────────────────────────────────────────────────────────────
+  // ── Audio ─────────────────────────────────────────────────────────────────
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   function getAudioCtx(): AudioContext | null {
@@ -131,41 +112,36 @@ export default function MemoryGridGameScreen({ onComplete, onHome }: Props) {
     return audioCtxRef.current;
   }
 
-  /** Brief tap tick — pentatonic scale mapped to cell index */
   function playCellTap(cellIdx: number) {
     const ctx = getAudioCtx();
     if (!ctx) return;
     try {
       const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25];
-      const freq  = scale[cellIdx % scale.length];
       const osc   = ctx.createOscillator();
       const gain  = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      osc.connect(gain); gain.connect(ctx.destination);
       osc.type = 'triangle';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.22, ctx.currentTime);
+      osc.frequency.value = scale[cellIdx % scale.length];
+      gain.gain.setValueAtTime(0.20, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.10);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.12);
     } catch { /* silent */ }
   }
 
-  /** Result chord — major for correct, minor low for wrong */
   function playResult(correct: boolean) {
     const ctx = getAudioCtx();
     if (!ctx) return;
     try {
       const freqs = correct ? [523.25, 659.25, 783.99] : [220.00, 261.63];
-      const dur   = correct ? 0.30 : 0.25;
+      const dur   = correct ? 0.28 : 0.22;
       freqs.forEach((freq, i) => {
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+        osc.connect(gain); gain.connect(ctx.destination);
         osc.type = correct ? 'sine' : 'sawtooth';
         osc.frequency.value = freq;
-        gain.gain.setValueAtTime(correct ? 0.18 : 0.10, ctx.currentTime + i * 0.04);
+        gain.gain.setValueAtTime(correct ? 0.16 : 0.09, ctx.currentTime + i * 0.04);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.04 + dur);
         osc.start(ctx.currentTime + i * 0.04);
         osc.stop(ctx.currentTime + i * 0.04 + dur + 0.05);
@@ -173,132 +149,125 @@ export default function MemoryGridGameScreen({ onComplete, onHome }: Props) {
     } catch { /* silent */ }
   }
 
-  // ── Helpers to keep ref + state in sync ──────────────────────────────────
+  // ── Timer helpers ─────────────────────────────────────────────────────────
 
-  function setPhaseSync(p: Phase) {
-    phaseRef.current = p;
-    setPhase(p);
+  function clearTimer() {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
   }
 
-  function clearTimers() {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-  }
+  // ── Game engine ───────────────────────────────────────────────────────────
 
-  // ── Round lifecycle ───────────────────────────────────────────────────────
-
-  function beginRound(r: number) {
+  function startRound(r: number) {
     if (doneRef.current) return;
-    clearTimers();
+    clearTimer(); // cancel any pending result or preview timer
 
-    roundRef.current = r;
-    const cfg   = getConfig(r);
-    const cells = pickCells(cfg.gridSize, cfg.cells);
+    const cfg  = getConfig(r);
+    const tgts = pickCells(cfg.gridSize, cfg.cells);
 
-    // Update both refs and state atomically-as-possible
-    targetCellsRef.current   = cells;
-    selectedCellsRef.current = new Set();
+    // Write refs first — these are read by handlers, not from React state
+    roundRef.current    = r;
+    targetsRef.current  = tgts;
+    selectedRef.current = new Set();
+    phaseRef.current    = 'preview';
 
+    // Flush to React state for rendering
     setRound(r);
-    setTargetCells(new Set(cells));   // new Set so React always sees a change
-    setSelectedCells(new Set());
-    setAllCorrect(false);
-    setPhaseSync('preview');
+    setTargets(new Set(tgts));  // new Set() forces diff even if same object
+    setSelected(new Set());
+    setLastCorrect(false);
+    setPhase('preview');
 
-    const t = setTimeout(() => {
+    // Switch from preview → input after the preview window
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
       if (doneRef.current) return;
-      setPhaseSync('selecting');
+      phaseRef.current = 'input';
+      setPhase('input');
     }, cfg.previewMs);
-    timersRef.current.push(t);
   }
+
+  // ── Mount / unmount ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    const t = setTimeout(() => beginRound(1), 500);
+    // Reset all mutable state — safe for React Strict Mode double-invoke
+    doneRef.current       = false;
+    completedRef.current  = 0;
+    totalCorrectRef.current = 0;
+
+    const t = setTimeout(() => startRound(1), 400);
+
     return () => {
       clearTimeout(t);
-      clearTimers();
+      clearTimer();
+      doneRef.current = true;
       audioCtxRef.current?.close().catch(() => {});
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Tap handler — reads from refs to avoid stale closures ────────────────
+  // ── Tap handler ───────────────────────────────────────────────────────────
 
   function handleCellTap(cellIdx: number) {
-    if (phaseRef.current !== 'selecting' || doneRef.current) return;
+    if (phaseRef.current !== 'input' || doneRef.current) return;
+    if (selectedRef.current.has(cellIdx)) return; // no deselection, no double-tap
+
+    const next = new Set(selectedRef.current);
+    next.add(cellIdx);
+    selectedRef.current = next;
+    setSelected(new Set(next));
     playCellTap(cellIdx);
 
-    const prev = selectedCellsRef.current;
-    if (prev.has(cellIdx)) {
-      // Toggle: deselect
-      const next = new Set(prev);
-      next.delete(cellIdx);
-      selectedCellsRef.current = next;
-      setSelectedCells(new Set(next));
-      return;
-    }
-
-    const next = new Set(prev);
-    next.add(cellIdx);
-    selectedCellsRef.current = next;
-    setSelectedCells(new Set(next));
-
     const cfg = getConfig(roundRef.current);
-    if (next.size === cfg.cells) {
-      submitSelection(next);
-    }
-  }
+    if (next.size < cfg.cells) return; // still selecting
 
-  function submitSelection(selection: Set<number>) {
-    // Guard: prevent double-submit (e.g. two rapid final taps)
-    if (phaseRef.current !== 'selecting') return;
-    setPhaseSync('feedback');
+    // ── All required cells tapped — evaluate immediately ─────────────────────
+    phaseRef.current = 'result';
+    setPhase('result');
 
-    const targets = targetCellsRef.current;   // always fresh via ref
-    let correct = 0;
-    for (const c of selection) {
-      if (targets.has(c)) correct++;
-    }
-    const cfg = getConfig(roundRef.current);
-    const roundAllCorrect = correct === cfg.cells;
-    playResult(roundAllCorrect);
+    const tgts    = targetsRef.current;
+    let   correct = 0;
+    for (const c of next) { if (tgts.has(c)) correct++; }
+    const allCorrect = correct === tgts.size;
 
+    setLastCorrect(allCorrect);
     totalCorrectRef.current += correct;
-    if (roundAllCorrect) completedRef.current++;
+    if (allCorrect) completedRef.current++;
+    playResult(allCorrect);
 
-    setAllCorrect(roundAllCorrect);
-
-    const t = setTimeout(() => {
+    // After showing result, advance or end
+    clearTimer();
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
       if (doneRef.current) return;
-      if (roundAllCorrect) {
-        beginRound(roundRef.current + 1);
+      if (allCorrect) {
+        startRound(roundRef.current + 1);
       } else {
-        // Game over
         doneRef.current = true;
         const score = completedRef.current * 20 + totalCorrectRef.current * 3;
         onCompleteRef.current(completedRef.current, totalCorrectRef.current, score);
       }
-    }, 1400);
-    timersRef.current.push(t);
+    }, 1300);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const cfg        = getConfig(round);
-  const gridSize   = cfg.gridSize;
-  const totalCells = gridSize * gridSize;
+  const cfg      = getConfig(round);
+  const gridSize = cfg.gridSize;
 
   function cellClass(idx: number): string {
-    const classes = ['mg-cell'];
-    if (phase === 'preview' && targetCells.has(idx)) classes.push('mg-cell--preview');
-    if (phase === 'selecting' && selectedCells.has(idx)) classes.push('mg-cell--selected');
-    if (phase === 'feedback') {
-      const wasTarget   = targetCells.has(idx);
-      const wasSelected = selectedCells.has(idx);
-      if (wasTarget && wasSelected)   classes.push('mg-cell--correct');
-      else if (!wasTarget && wasSelected) classes.push('mg-cell--wrong');
-      else if (wasTarget && !wasSelected) classes.push('mg-cell--missed');
+    const cls = ['mg-cell'];
+    if (phase === 'preview' && targets.has(idx))  cls.push('mg-cell--preview');
+    if (phase === 'input'   && selected.has(idx)) cls.push('mg-cell--selected');
+    if (phase === 'result') {
+      const wasTgt = targets.has(idx);
+      const wasSel = selected.has(idx);
+      if      (wasTgt && wasSel) cls.push('mg-cell--correct');
+      else if (wasSel)           cls.push('mg-cell--wrong');
+      else if (wasTgt)           cls.push('mg-cell--missed');
     }
-    return classes.join(' ');
+    return cls.join(' ');
   }
 
   return (
@@ -309,22 +278,31 @@ export default function MemoryGridGameScreen({ onComplete, onHome }: Props) {
         <button className="color-overlay-btn" onClick={onHome} aria-label="Back to home">
           ← Home
         </button>
-        <span className="mg-round-label">Round {round} <span className="mg-done-inline">{completedRef.current > 0 ? `· ${completedRef.current}✓` : ''}</span></span>
+        <span className="mg-round-label">
+          Round {round}
+          {completedRef.current > 0 && (
+            <span className="mg-done-inline"> · {completedRef.current}✓</span>
+          )}
+        </span>
         <span className="mg-game-name">Memory Grid</span>
       </div>
 
       {/* Phase status */}
       <div className="mg-status-row">
-        {phase === 'ready'     && <span className="mg-status mg-status--ready">Get ready…</span>}
-        {phase === 'preview'   && <span className="mg-status mg-status--preview">Remember the cells!</span>}
-        {phase === 'selecting' && (
+        {phase === 'idle' && (
+          <span className="mg-status mg-status--ready">Get ready…</span>
+        )}
+        {phase === 'preview' && (
+          <span className="mg-status mg-status--preview">Remember the cells!</span>
+        )}
+        {phase === 'input' && (
           <span className="mg-status mg-status--selecting">
-            Tap {cfg.cells - selectedCells.size} more
+            Tap {cfg.cells - selected.size} more
           </span>
         )}
-        {phase === 'feedback' && (
-          <span className={`mg-status ${allCorrect ? 'mg-status--correct' : 'mg-status--wrong'}`}>
-            {allCorrect ? '✓ Perfect!' : '✕ Wrong'}
+        {phase === 'result' && (
+          <span className={`mg-status ${lastCorrect ? 'mg-status--correct' : 'mg-status--wrong'}`}>
+            {lastCorrect ? '✓ Perfect!' : '✕ Wrong'}
           </span>
         )}
       </div>
@@ -334,9 +312,9 @@ export default function MemoryGridGameScreen({ onComplete, onHome }: Props) {
         className="mg-grid"
         style={{ '--mg-cols': gridSize } as React.CSSProperties}
       >
-        {Array.from({ length: totalCells }, (_, i) => (
+        {Array.from({ length: gridSize * gridSize }, (_, i) => (
           <button
-            key={i}
+            key={`${round}-${i}`}
             className={cellClass(i)}
             onPointerDown={() => handleCellTap(i)}
             aria-label={`Cell ${i + 1}`}

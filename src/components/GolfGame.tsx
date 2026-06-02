@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { GolfRoundResult, RoomContext } from '../types';
 import { golfCourses }           from '../data/golfCourses';
 import { useBackgroundMusic }    from '../hooks/useBackgroundMusic';
@@ -28,7 +28,9 @@ function pickRandom<T>(arr: T[], n: number, rng: () => number = Math.random): T[
 
 export default function GolfGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }           = useBackgroundMusic();
-  const [screen,       setScreen]       = useState<GolfScreen>('intro');
+  // In room mode: skip intro → go straight to playing, start golf music immediately
+  const [screen,       setScreen]       = useState<GolfScreen>(roomContext ? 'playing' : 'intro');
+  useEffect(() => { if (roomContext) setTrack('golf'); }, []);
   const [selected,     setSelected]     = useState(() => pickRandom(golfCourses, 5, makeGameRng(roomContext, 'golf')));
   const [currentRound, setCurrentRound] = useState(0);   // 0–4
   const [roundResults, setRoundResults] = useState<GolfRoundResult[]>([]);

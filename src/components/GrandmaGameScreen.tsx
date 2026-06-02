@@ -1218,14 +1218,15 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     shuffledSeq:   [...pattern.sequence] as ('low' | 'high' | 'gap')[],
   });
 
-  const jumpPressRef  = useRef(false);
-  const crouchHeldRef = useRef(false);
+  const jumpPressRef    = useRef(false);
+  const crouchHeldRef   = useRef(false);
+  // Tracks the pointer ID currently holding the left (duck) zone.
+  // Ensures crouch ends when THAT finger lifts, even if it drifted right.
+  const leftPointerRef  = useRef<number | null>(null);
+  // Ref for the outer wrap so we measure actual container width for zone split.
+  const stageRef        = useRef<HTMLDivElement>(null);
 
-  // ── One-hand tap / hold refs ────────────────────────────────────────────────
-  // Quick tap (< HOLD_THRESHOLD ms) → jump.  Long press → crouch (held until release).
-  const HOLD_THRESHOLD = 110; // ms
-  const holdTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdActiveRef  = useRef(false);
+  // ── Touch zone refs (left = duck, right = jump) ─────────────────────────────
 
   // React state for display
   const [displayScore,    setDisplayScore]    = useState(0);
@@ -1239,16 +1240,15 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   const bannerTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ticketIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Portrait / orientation support ───────────────────────────────────────
+  // ── Orientation tracking ──────────────────────────────────────────────────
+  // The game is landscape-first. When the phone is physically rotated sideways,
+  // the viewport becomes landscape and the canvas fills it naturally via CSS.
+  // In portrait we show a small non-blocking hint but never block gameplay.
   function calcOrient() {
-    const isP  = window.innerWidth < window.innerHeight;
-    const scl  = isP
-      ? Math.min(window.innerWidth / CH, (window.innerHeight - 56) / CW)
-      : 1;
-    return { isPortrait: isP, scale: scl };
+    return { isPortrait: window.innerWidth < window.innerHeight };
   }
   const [orient, setOrient] = useState(calcOrient);
-  const { isPortrait, scale: portraitScale } = orient;
+  const { isPortrait } = orient;
 
   useEffect(() => {
     function update() { setOrient(calcOrient()); }
@@ -1684,50 +1684,67 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     };
   }, []);
 
-  // ── One-hand pointer controls ─────────────────────────────────────────────
-  // Quick tap (< HOLD_THRESHOLD) = jump.  Long press (≥ HOLD_THRESHOLD) = crouch.
-  // No left/right or top/bottom zones — tap anywhere.
+  // ── Left / right touch zone controls ─────────────────────────────────────────
+  // Left visual half  → hold to duck, release to stand.
+  // Right visual half → tap to jump.
+  //
+  // In portrait the game stage is CSS-rotated 90° clockwise inside the wrap.
+  // After that rotation, the game's visual LEFT↔RIGHT maps to the physical
+  // screen's TOP↔BOTTOM (Y axis).  So we split on Y in portrait, X in landscape.
+  //
+  // Pointer-capture on the duck pointer ensures pointerup fires on this div
+  // even when the finger slides across the divider before lifting.
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    // Ignore clicks on the Home button (propagation for buttons is stopped separately)
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
-    try { (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); } catch (_) { /* noop */ }
-    holdActiveRef.current = false;
-    holdTimerRef.current = setTimeout(() => {
-      holdActiveRef.current = true;
-      crouchHeldRef.current = true;
-      jumpPressRef.current  = false;
-    }, HOLD_THRESHOLD);
+
+    const rect = stageRef.current?.getBoundingClientRect();
+    let isLeft: boolean;
+
+    if (isPortrait) {
+      // Stage rotated -90° CCW → visual left/right = physical bottom/top (Y, inverted).
+      const y    = rect ? e.clientY - rect.top  : e.clientY;
+      const half = rect ? rect.height / 2       : window.innerHeight / 2;
+      isLeft = y >= half;
+    } else {
+      // Normal landscape: visual left/right = physical left/right (X).
+      const x    = rect ? e.clientX - rect.left : e.clientX;
+      const half = rect ? rect.width  / 2       : window.innerWidth  / 2;
+      isLeft = x < half;
+    }
+
+    if (isLeft) {
+      // ── Duck zone ──────────────────────────────────────────────────────────
+      try { (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); } catch (_) {}
+      leftPointerRef.current = e.pointerId;
+      crouchHeldRef.current  = true;
+    } else {
+      // ── Jump zone ──────────────────────────────────────────────────────────
+      jumpPressRef.current = true;
+    }
   }
+
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (holdActiveRef.current) {
-      // End crouch
-      crouchHeldRef.current = false;
-      holdActiveRef.current = false;
-    } else {
-      // Quick tap → jump
-      jumpPressRef.current  = true;
-      crouchHeldRef.current = false;
+    // Release duck only for the specific pointer that started it.
+    if (e.pointerId === leftPointerRef.current) {
+      leftPointerRef.current = null;
+      crouchHeldRef.current  = false;
     }
   }
-  function handlePointerCancel() {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
+
+  function handlePointerCancel(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerId === leftPointerRef.current) {
+      leftPointerRef.current = null;
     }
     crouchHeldRef.current = false;
-    holdActiveRef.current = false;
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
+      ref={stageRef}
       className={`grandma-game-wrap${isHot ? ' grandma-game-wrap--hot' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -1747,20 +1764,30 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         <span className="grandma-score-live">{displayScore}</span>
       </div>
 
-      {/* Canvas + overlays */}
+      {/*
+        ── Game field ──────────────────────────────────────────────────────────
+        Landscape: fills the full viewport via CSS (position: absolute; inset: 0).
+        Portrait : CSS-rotated 90° clockwise so the phone stays physically
+                   vertical but the game appears as a landscape runner.
+                   width / height are SWAPPED (100dvh × 100vw) so after the
+                   rotation the stage fills the whole portrait screen.
+      */}
       <div
-        className={`grandma-game-field${isPortrait ? ' grandma-game-field--portrait' : ''}`}
+        className="grandma-game-field"
         style={isPortrait ? {
-          position:        'absolute' as const,
+          position:        'absolute'  as const,
           top:             '50%',
           left:            '50%',
-          width:           CW,
-          height:          CH,
-          transform:       `translate(-50%, -50%) rotate(-90deg) scale(${portraitScale})`,
+          right:           'auto'      as const,
+          bottom:          'auto'      as const,
+          width:           '100dvh',   /* becomes the landscape "width" after rotation */
+          height:          '100vw',    /* becomes the landscape "height" after rotation */
+          transform:       'translate(-50%, -50%) rotate(-90deg)',
           transformOrigin: 'center center',
-        } : { position: 'relative' as const }}
+          overflow:        'hidden'    as const,
+        } : undefined}
       >
-        {/* Inner wrapper receives the shake animations — keeps field transform clean */}
+        {/* Inner wrapper — shake / hot animations live here */}
         <div className={`grandma-game-inner${virginMode ? ' grandma-game-inner--virgin' : ''}${isHot ? ' grandma-game-inner--hot' : ''}`}>
           {isHot && (
             <div className="grandma-hot-badge" aria-hidden="true">
@@ -1806,10 +1833,19 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Countdown */}
-      {countdownActive && <CountdownOverlay count={countdown} />}
+        {/*
+          Touch zone overlay and countdown live INSIDE the field so they
+          rotate with the canvas in portrait and stay aligned in landscape.
+        */}
+        <div className="grandma-zones" aria-hidden="true">
+          <span className="grandma-zone-label grandma-zone-label--duck">DUCK</span>
+          <div  className="grandma-zone-divider" />
+          <span className="grandma-zone-label grandma-zone-label--jump">JUMP</span>
+        </div>
+
+        {countdownActive && <CountdownOverlay count={countdown} />}
+      </div>
     </div>
   );
 }

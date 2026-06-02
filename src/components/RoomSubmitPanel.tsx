@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RoomContext } from '../types';
 import { submitRoomScore, type ScoreType } from '../lib/roomScores';
@@ -9,19 +9,24 @@ interface Props {
   scoreValue:  number;
   scoreLabel:  string;
   scoreType:   ScoreType;
-  onBackToRoom: () => void;   // calls parent's onExit → returns to room lobby
+  onBackToRoom: () => void;
 }
 
-type SubmitState = 'idle' | 'submitting' | 'done' | 'error';
+type SubmitState = 'submitting' | 'done' | 'error';
 
 export default function RoomSubmitPanel({
   roomContext, mode, scoreValue, scoreLabel, scoreType, onBackToRoom,
 }: Props) {
   const navigate = useNavigate();
-  const [state,   setState]   = useState<SubmitState>('idle');
-  const [errMsg,  setErrMsg]  = useState('');
+  const [state,  setState]  = useState<SubmitState>('submitting');
+  const [errMsg, setErrMsg] = useState('');
 
-  async function handleSubmit() {
+  // Prevent double-submission (React StrictMode runs effects twice in dev)
+  const submittedRef = useRef(false);
+
+  async function doSubmit() {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setState('submitting');
     setErrMsg('');
     try {
@@ -38,10 +43,14 @@ export default function RoomSubmitPanel({
       });
       setState('done');
     } catch (e) {
+      submittedRef.current = false;   // allow retry
       setState('error');
       setErrMsg(e instanceof Error ? e.message : 'Something went wrong.');
     }
   }
+
+  // Auto-submit on mount — no manual button required
+  useEffect(() => { doSubmit(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleViewScoreboard() {
     navigate(`/room/${roomContext.roomCode}/scoreboard`);
@@ -55,22 +64,17 @@ export default function RoomSubmitPanel({
         <span className="room-submit-code">#{roomContext.roomCode}</span>
       </div>
 
-      {state === 'idle' && (
-        <button className="btn-primary room-submit-btn" onClick={handleSubmit}>
-          Submit to Room Leaderboard
-        </button>
-      )}
-
       {state === 'submitting' && (
-        <button className="btn-primary room-submit-btn" disabled>
-          Submitting…
-        </button>
+        <div className="room-submit-submitting">
+          <div className="room-loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+          <p className="room-submit-submitting-label">Submitting score…</p>
+        </div>
       )}
 
       {state === 'error' && (
         <div className="room-submit-error">
           <p className="room-submit-error-msg">{errMsg}</p>
-          <button className="btn-secondary" onClick={handleSubmit}>
+          <button className="btn-secondary" onClick={doSubmit}>
             Retry
           </button>
         </div>

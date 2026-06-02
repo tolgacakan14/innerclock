@@ -45,15 +45,21 @@ export default function GrandmaIntroScreen({ onStart, onBack, onHotMode }: Props
 
       <div className="grandma-intro-rules">
         <div className="grandma-intro-rule">
-          <span className="grandma-intro-rule-icon">↑</span>
+          <span className="grandma-intro-rule-icon">↻</span>
           <span>
-            <strong>Jump</strong> — tap anywhere (or Space / ↑ on desktop)
+            <strong>On mobile</strong> — turn your phone sideways after tapping Start
           </span>
         </div>
         <div className="grandma-intro-rule">
           <span className="grandma-intro-rule-icon">↓</span>
           <span>
-            <strong>Crouch</strong> — hold anywhere · release to stand (or ↓ / S on desktop)
+            <strong>Left side</strong> — hold to duck · release to stand · ↓ / S on desktop
+          </span>
+        </div>
+        <div className="grandma-intro-rule">
+          <span className="grandma-intro-rule-icon">↑</span>
+          <span>
+            <strong>Right side</strong> — tap to jump · Space / ↑ on desktop
           </span>
         </div>
         <div className="grandma-intro-rule">

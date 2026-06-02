@@ -49,7 +49,8 @@ function pickBoards(rng: () => number = Math.random) {
 export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack } = useBackgroundMusic();
   useEffect(() => { setTrack('main'); return () => { setTrack('main'); }; }, []);
-  const [screen,       setScreen]       = useState<AEScreen>('intro');
+  // In room mode: skip intro → go straight to playing
+  const [screen,       setScreen]       = useState<AEScreen>(roomContext ? 'playing' : 'intro');
   const [selected,     setSelected]     = useState(() => pickBoards(makeGameRng(roomContext, 'arrowEscape')));
   const [currentRound, setCurrentRound] = useState(0);
   const [roundResults, setRoundResults] = useState<ArrowEscapeRoundResult[]>([]);

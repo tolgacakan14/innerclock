@@ -68,7 +68,7 @@ export default function SoloApp() {
             className="home-entry-card"
             onClick={() => setView(playerName ? 'home' : 'name')}
           >
-            <span className="home-entry-card-icon">🎮</span>
+            <span className="home-entry-card-icon">▷</span>
             <div className="home-entry-card-body">
               <span className="home-entry-card-title">Solo Play</span>
               <span className="home-entry-card-sub">Play by yourself — no account needed</span>
@@ -80,7 +80,7 @@ export default function SoloApp() {
             className="home-entry-card"
             onClick={() => setView('create-room')}
           >
-            <span className="home-entry-card-icon">🏠</span>
+            <span className="home-entry-card-icon">+</span>
             <div className="home-entry-card-body">
               <span className="home-entry-card-title">Create Room</span>
               <span className="home-entry-card-sub">Start a room and invite friends</span>
@@ -92,7 +92,7 @@ export default function SoloApp() {
             className="home-entry-card"
             onClick={() => setView('join-room')}
           >
-            <span className="home-entry-card-icon">🔗</span>
+            <span className="home-entry-card-icon">→</span>
             <div className="home-entry-card-body">
               <span className="home-entry-card-title">Join Room</span>
               <span className="home-entry-card-sub">Enter a room code to compete</span>

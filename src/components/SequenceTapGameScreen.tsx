@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { musicManager } from '../audio';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -112,8 +113,16 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
   }
 
   function beep(tileIdx: number, vol = 0.35) {
+    if (!musicManager.enabled) return;   // respect global audio toggle
     const ctx = getAudioCtx();
-    if (ctx) playBeep(tileIdx, ctx, vol);
+    if (!ctx) return;
+    // AudioContext.resume() is async — wait for it before scheduling nodes,
+    // otherwise the oscillator silently drops on the first tap (iOS / Chrome).
+    if (ctx.state === 'running') {
+      playBeep(tileIdx, ctx, vol);
+    } else {
+      ctx.resume().then(() => playBeep(tileIdx, ctx, vol)).catch(() => {});
+    }
   }
 
   // ── Elapsed time ──────────────────────────────────────────────────────────

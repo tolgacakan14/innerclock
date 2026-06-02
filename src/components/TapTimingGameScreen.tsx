@@ -4,18 +4,22 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 
 const GAME_DURATION = 30;   // seconds
 const TAP_COOLDOWN  = 200;  // ms between taps (prevents spam)
-const GOOD_HALF     = 0.20; // good zone half-width (±20% of center)
+const GOOD_HALF     = 0.17; // good zone half-width — tightened from 0.20
 
 // ── Difficulty helpers ────────────────────────────────────────────────────────
 
-/** Marker speed in bounces/second: increases from 0.45 → 1.6 over 30 s. */
+/** Marker speed in bounces/second: increases from 0.62 → 2.22 over 30 s.
+ *  Base +38%, acceleration +52% vs the previous curve.
+ */
 function getSpeed(elapsed: number): number {
-  return 0.45 + (elapsed / GAME_DURATION) * 1.15;
+  return 0.62 + (elapsed / GAME_DURATION) * 1.60;
 }
 
-/** Perfect zone half-width: shrinks from 0.13 → 0.06 over 30 s. */
+/** Perfect zone half-width: shrinks from 0.095 → 0.042 over 30 s.
+ *  ~27% narrower at start, ~30% narrower at end vs previous curve.
+ */
 function getPerfectHalf(elapsed: number): number {
-  return Math.max(0.06, 0.13 - (elapsed / GAME_DURATION) * 0.07);
+  return Math.max(0.042, 0.095 - (elapsed / GAME_DURATION) * 0.053);
 }
 
 // ── Feedback pop type ─────────────────────────────────────────────────────────
@@ -179,8 +183,15 @@ export default function TapTimingGameScreen({ onComplete, onHome }: Props) {
         >
           ← Home
         </button>
-        {timeLeft > 0 && (
-          <span className={`tt-timer${isCritical ? ' tt-timer--critical' : ''}`}>
+        {/* White timer — visible only above 5 s, unmounts cleanly at the 5 s mark */}
+        {timeLeft > 5 && (
+          <span className="tt-timer">
+            {timeLeft.toFixed(1)}s
+          </span>
+        )}
+        {/* Red critical countdown — appears only for the final 5 s */}
+        {isCritical && timeLeft > 0 && (
+          <span className="tt-timer tt-timer--critical" key="critical">
             {timeLeft.toFixed(1)}s
           </span>
         )}

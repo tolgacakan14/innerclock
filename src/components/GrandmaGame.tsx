@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { makeGameRng } from '../utils';
 import type { GrandmaRoundResult } from '../types';
 import { grandmaPatterns }          from '../data/grandmaPatterns';
@@ -46,7 +46,9 @@ function pickRandom(arr: GrandmaPattern[], n: number, rng: () => number = Math.r
 
 export default function GrandmaGame({ playerName, onExit, roomContext }: Props) {
   const { setTrack }               = useBackgroundMusic();
-  const [screen,       setScreen]  = useState<GrandmaScreen>('intro');
+  // In room mode: skip intro → go straight to playing, start grandma music
+  const [screen,       setScreen]  = useState<GrandmaScreen>(roomContext ? 'playing' : 'intro');
+  useEffect(() => { if (roomContext) setTrack('grandma'); }, []);
   const [selected,     setSelected]     = useState(() => pickRandom(grandmaPatterns, 3, makeGameRng(roomContext, 'grandma')));
   const [currentRound, setCurrentRound] = useState(0);
   const [roundResults,      setRoundResults]      = useState<GrandmaRoundResult[]>([]);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBackgroundMusic }      from '../hooks/useBackgroundMusic';
+import { musicManager }            from '../audio';
 import SequenceTapGameScreen       from './SequenceTapGameScreen';
 import SequenceTapResultScreen     from './SequenceTapResultScreen';
 
@@ -12,8 +13,15 @@ interface Props {
 }
 
 export default function SequenceTapGame({ playerName, onExit, roomContext }: Props) {
-  const { setTrack }   = useBackgroundMusic();
-  useEffect(() => { setTrack('main'); }, []);
+  useBackgroundMusic(); // keep subscription alive; no music for Sequence Tap
+  useEffect(() => {
+    // Sequence Tap uses only tap sounds — silence background music for this game
+    musicManager.silence();
+    return () => {
+      // Restore music when leaving Sequence Tap
+      musicManager.unsilence();
+    };
+  }, []);
   const [screen,          setScreen]          = useState<Screen>('playing');
   const [completedLevels, setCompletedLevels] = useState(0);
   const [maxSeqLen,       setMaxSeqLen]       = useState(0);
@@ -33,7 +41,6 @@ export default function SequenceTapGame({ playerName, onExit, roomContext }: Pro
   }
 
   function handleExit() {
-    setTrack('main');
     onExit();
   }
 
