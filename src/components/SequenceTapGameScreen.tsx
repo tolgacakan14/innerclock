@@ -100,29 +100,16 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
   // ── Web Audio ─────────────────────────────────────────────────────────────
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  function getAudioCtx(): AudioContext | null {
-    if (!audioCtxRef.current) {
-      try {
-        audioCtxRef.current = new (window.AudioContext ?? (window as any).webkitAudioContext)();
-      } catch (_) { return null; }
-    }
-    if (audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume().catch(() => {});
-    }
-    return audioCtxRef.current;
-  }
-
+  /**
+   * Demo-only beep: only fires if the AudioContext is already running.
+   * Never tries to create or resume — those operations belong in a real
+   * user-gesture handler (handleTileTap), not in a setTimeout callback.
+   */
   function beep(tileIdx: number, vol = 0.35) {
-    if (!musicManager.enabled) return;   // respect global audio toggle
-    const ctx = getAudioCtx();
-    if (!ctx) return;
-    // AudioContext.resume() is async — wait for it before scheduling nodes,
-    // otherwise the oscillator silently drops on the first tap (iOS / Chrome).
-    if (ctx.state === 'running') {
-      playBeep(tileIdx, ctx, vol);
-    } else {
-      ctx.resume().then(() => playBeep(tileIdx, ctx, vol)).catch(() => {});
-    }
+    if (!musicManager.enabled) return;
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state !== 'running') return;
+    playBeep(tileIdx, ctx, vol);
   }
 
   // ── Elapsed time ──────────────────────────────────────────────────────────
@@ -184,8 +171,21 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
   function handleTileTap(tileIndex: number) {
     if (phase !== 'input' || doneRef.current) return;
 
-    // Lazy-init AudioContext on first real user gesture
-    getAudioCtx();
+    // ── Create / unlock AudioContext synchronously inside the gesture handler ──
+    // On iOS and Chrome, AudioContext must be created (or resumed) within the
+    // synchronous call stack of a real user-gesture event.  Doing this here —
+    // before any async work — guarantees playBeep() can run immediately.
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      try {
+        audioCtxRef.current = new (window.AudioContext ?? (window as any).webkitAudioContext)();
+      } catch (_) {}
+    }
+    const ctx = audioCtxRef.current;
+    // If still suspended (some browsers), kick off resume synchronously.
+    // The context transitions to 'running' fast enough for playBeep below.
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     // ── Instant visual feedback: light up the tapped tile ─────────────────────
     if (pressedTimerRef.current) clearTimeout(pressedTimerRef.current);
@@ -193,10 +193,21 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
     pressedTimerRef.current = setTimeout(() => setPressedTile(-1), 160);
 
     const expected = sequence[inputProgress.length];
+    const isWrong  = tileIndex !== expected;
+    const vol      = isWrong ? 0.25 : 0.35;
 
-    if (tileIndex !== expected) {
-      // Wrong tap — game over
-      beep(tileIndex, 0.25);
+    // ── Play beep synchronously — we are still inside the gesture handler ──────
+    if (musicManager.enabled && ctx) {
+      if (ctx.state === 'running') {
+        playBeep(tileIndex, ctx, vol);
+      } else {
+        // Fallback for browsers where resume() is not instant:
+        // schedule playback as soon as running state is reached.
+        ctx.resume().then(() => playBeep(tileIndex, ctx, vol)).catch(() => {});
+      }
+    }
+
+    if (isWrong) {
       setWrongTileIdx(tileIndex);
       setPhase('wrong');
       doneRef.current = true;
@@ -208,8 +219,6 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
       timersRef.current.push(tid);
       return;
     }
-
-    beep(tileIndex, 0.35); // correct tap beep
 
     const newProgress = [...inputProgress, tileIndex];
     setInputProgress(newProgress);
