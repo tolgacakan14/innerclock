@@ -156,6 +156,18 @@ export default function SequenceTapGameScreen({ onComplete, onHome }: Props) {
 
   // Start game on mount
   useEffect(() => {
+    // Eagerly create + resume AudioContext so demo beeps work from level 1.
+    // The user just tapped to reach this screen, so the browser typically
+    // grants resume() immediately (page already has user activation).
+    // On iOS without prior activation this silently fails — the context is
+    // then unlocked on the first tile tap, and demos sound from level 2 onward.
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      try {
+        audioCtxRef.current = new (window.AudioContext ?? (window as any).webkitAudioContext)();
+      } catch (_) {}
+    }
+    audioCtxRef.current?.resume().catch(() => {});
+
     startTimeRef.current = performance.now();
     const t = setTimeout(() => startLevel(1), 500);
     return () => {
