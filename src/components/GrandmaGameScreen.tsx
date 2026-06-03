@@ -37,6 +37,10 @@ const BUFFER_F = 5;      // jump-buffer frames
 const BASE_SPEED = 3.0;  // px/frame at 60 fps
 const DEATH_MS   = 1000; // death animation duration
 
+// Fast-drop (airborne duck) tuning
+const FAST_DROP_VY           = 14;   // minimum downward px/frame when fast-drop starts
+const FAST_DROP_GRAVITY_MULT =  4;   // gravity multiplier while fast-dropping (~140 ms from mid-arc)
+
 // ── Speed levels ─────────────────────────────────────────────────────────────
 //   0–5 s   Beginner    1.00×
 //   5–10 s  Adapte      1.30×
@@ -1216,6 +1220,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
     // Re-shuffled with Fisher-Yates at the start of each new cycle so the
     // obstacle order never loops identically — prevents memorisation.
     shuffledSeq:   [...pattern.sequence] as ('low' | 'high' | 'gap')[],
+    fastDrop:      false,   // true while airborne-duck fast-drop is in progress
   });
 
   const jumpPressRef    = useRef(false);
@@ -1521,11 +1526,25 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         gs.jumpBuffer   = 0;
       }
 
+      // ── Airborne duck: fast-drop trigger ─────────────────────────────────────
+      // First frame DUCK is pressed while airborne: arm the fast-drop.
+      // Subsequent frames (while still airborne + fastDrop): boosted gravity keeps it going.
+      // fastDrop persists even if DUCK is released before landing —
+      // the crouch-on-landing depends on crouchHeldRef at that moment, not fastDrop.
+      if (crouchHeldRef.current && !gs.onGround && !gs.fastDrop) {
+        gs.fastDrop     = true;
+        // Override any upward velocity with at least FAST_DROP_VY downward
+        gs.charVY       = Math.max(gs.charVY, FAST_DROP_VY);
+        gs.coyoteFrames = 0;
+        gs.jumpBuffer   = 0;
+      }
+
       // Crouch only on ground
       gs.crouching = crouchHeldRef.current && gs.onGround;
 
-      // Gravity + vertical integration
-      gs.charVY += GRAVITY * dt;
+      // Gravity + vertical integration (boosted during fast-drop)
+      const gravMult = gs.fastDrop ? FAST_DROP_GRAVITY_MULT : 1;
+      gs.charVY += GRAVITY * gravMult * dt;
       gs.charY  += gs.charVY * dt;
 
       // ── Ground / gap collision ────────────────────────────────────────────
@@ -1539,6 +1558,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
           gs.charY    = GROUND_Y;
           gs.charVY   = 0;
           gs.onGround = true;
+          gs.fastDrop = false;   // clear fast-drop on landing
         }
       }
 
