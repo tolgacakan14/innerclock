@@ -1178,9 +1178,15 @@ interface Props {
 }
 
 export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onHome }: Props) {
-  // ── Hot Mode config (derived from pattern, stable for this component lifetime) ─
-  const isHot       = !!pattern.isHot;
-  const hotSpeedMult = pattern.speedMultiplier ?? 1;
+  // ── Hot Mode config — can activate mid-game (Virgin → Hot transition) ────────
+  const isHot        = !!pattern.isHot;          // initial value (also used by gsRef init below)
+  const hotSpeedMult  = pattern.speedMultiplier ?? 1;  // initial value
+
+  // Refs read by the RAF closure — updated without re-running the effect
+  const isHotRef        = useRef<boolean>(isHot);
+  const hotSpeedMultRef = useRef<number>(hotSpeedMult);
+  // React state drives the JSX class names / badge visibility
+  const [isHotActive, setIsHotActive] = useState<boolean>(isHot);
 
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const onCompleteRef = useRef(onComplete);
@@ -1244,6 +1250,9 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   const [tickets,         setTickets]         = useState<GrandmaTicket[]>([]);
   const bannerTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ticketIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Virgin → Hot Mode transition timer
+  const virginHotStartRef     = useRef<number | null>(null); // gs.elapsed when Virgin Mode began
+  const hotTransitionDoneRef  = useRef(false);               // fires only once per game
 
   // ── Orientation tracking ──────────────────────────────────────────────────
   // The game is landscape-first. When the phone is physically rotated sideways,
@@ -1368,16 +1377,16 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       const score = Math.floor(elapsed);
       ctx.save();
       ctx.font         = 'bold 22px -apple-system, Helvetica Neue, sans-serif';
-      ctx.fillStyle    = isHot ? 'rgba(255,130,80,0.98)' : 'rgba(255,255,255,0.92)';
+      ctx.fillStyle    = isHotRef.current ? 'rgba(255,130,80,0.98)' : 'rgba(255,255,255,0.92)';
       ctx.textAlign    = 'right';
       ctx.textBaseline = 'top';
       ctx.fillText(`${score}`, CW - 22, 20);
       ctx.font      = '12px -apple-system, Helvetica Neue, sans-serif';
-      ctx.fillStyle = isHot ? 'rgba(255,100,50,0.55)' : 'rgba(255,255,255,0.38)';
+      ctx.fillStyle = isHotRef.current ? 'rgba(255,100,50,0.55)' : 'rgba(255,255,255,0.38)';
       ctx.fillText('pts', CW - 22, 46);
       // Speed level indicator (small)
       ctx.font      = '11px -apple-system, Helvetica Neue, sans-serif';
-      if (isHot) {
+      if (isHotRef.current) {
         // HOT MODE badge — centred, pulsing orange
         const pulse = 0.85 + Math.sin(elapsed * 6) * 0.15;
         ctx.fillStyle   = `rgba(255,${Math.floor(50 + pulse * 30)},8,${0.88 + pulse * 0.12})`;
@@ -1410,7 +1419,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
       drawGaps(ctx, gs.obstacles);
 
       // ── Hot Mode: red canvas overlay + heat gradient ──────────────────────
-      if (isHot) {
+      if (isHotRef.current) {
         ctx.save();
         // Full-canvas crimson tint
         ctx.fillStyle = 'rgba(140,6,6,0.16)';
@@ -1498,9 +1507,25 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         if (newLevel >= 6) setVirginMode(true);
       }
 
+      // ── Virgin → Hot Mode: 10-second transition ───────────────────────────
+      // Record when Virgin Mode (level 6) is first reached (gs.elapsed is in seconds).
+      if (gs.currentLevel >= 6 && virginHotStartRef.current === null) {
+        virginHotStartRef.current = gs.elapsed;
+      }
+      // 10 s after Virgin Mode starts — flip into Hot Mode mid-run (no reset).
+      if (
+        virginHotStartRef.current !== null &&
+        !hotTransitionDoneRef.current &&
+        gs.elapsed - virginHotStartRef.current >= 10
+      ) {
+        hotTransitionDoneRef.current = true;
+        isHotRef.current             = true;  // RAF reads this immediately
+        setIsHotActive(true);                 // React re-render for CSS / badge
+      }
+
       // Smooth speed lerp toward the target multiplier for current level
-      // Hot Mode: hotSpeedMult doubles the effective BASE_SPEED throughout
-      const targetSpd = BASE_SPEED * hotSpeedMult * SPEED_LEVELS[gs.currentLevel].multiplier;
+      // Hot Mode: hotSpeedMultRef.current doubles the effective BASE_SPEED throughout
+      const targetSpd = BASE_SPEED * hotSpeedMultRef.current * SPEED_LEVELS[gs.currentLevel].multiplier;
       gs.speed       += (targetSpd - gs.speed) * LERP_F * dt;
       gs.scrollDist  += gs.speed * dt;
 
@@ -1637,13 +1662,13 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
 
       // Last Dance + Virgin Mode — grandma foot flames (drawn before grandma body)
       // Hot Mode: flames appear from the very start
-      if ((gs.currentLevel >= 5 || isHot) && gs.onGround) {
+      if ((gs.currentLevel >= 5 || isHotRef.current) && gs.onGround) {
         drawGrandmaFootFlames(ctx, CHAR_X, gs.charY, gs.legPhase);
       }
 
       // Chaser — creeps closer at higher levels, mirrors grandma with delay
       // Hot Mode: force draw level >= 4 so flames appear from frame 1
-      const chaserDrawLevel = isHot ? Math.max(4, gs.currentLevel) : gs.currentLevel;
+      const chaserDrawLevel = isHotRef.current ? Math.max(4, gs.currentLevel) : gs.currentLevel;
       const chaserX = (CHAR_X - 90) + gs.currentLevel * 8;
       if (chaserCrouch) {
         drawChaser(ctx, chaserX, GROUND_Y, gs.chaserLegPhase, chaserDrawLevel, true);
@@ -1765,7 +1790,7 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
   return (
     <div
       ref={stageRef}
-      className={`grandma-game-wrap${isHot ? ' grandma-game-wrap--hot' : ''}`}
+      className={`grandma-game-wrap${isHotActive ? ' grandma-game-wrap--hot' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
@@ -1808,8 +1833,8 @@ export default function GrandmaGameScreen({ pattern, roundIndex, onComplete, onH
         } : undefined}
       >
         {/* Inner wrapper — shake / hot animations live here */}
-        <div className={`grandma-game-inner${virginMode ? ' grandma-game-inner--virgin' : ''}${isHot ? ' grandma-game-inner--hot' : ''}`}>
-          {isHot && (
+        <div className={`grandma-game-inner${virginMode ? ' grandma-game-inner--virgin' : ''}${isHotActive ? ' grandma-game-inner--hot' : ''}`}>
+          {isHotActive && (
             <div className="grandma-hot-badge" aria-hidden="true">
               🔥 HOT MODE
             </div>

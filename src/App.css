@@ -5220,6 +5220,126 @@ body {
   padding: 32px 0;
 }
 
+/* ── All-Time Leaderboard ─────────────────────────────────────────────────── */
+
+/* Tab — cyan/teal accent, distinct from gold Form tab */
+.sb-tab--alltime {
+  background: rgba(90,200,245,0.10);
+  border-color: rgba(90,200,245,0.22);
+  color: rgba(90,200,245,0.78);
+  font-weight: 700;
+}
+.sb-tab--alltime.sb-tab--active {
+  background: rgba(90,200,245,0.20);
+  border-color: rgba(90,200,245,0.52);
+  color: rgba(140,220,255,1.00);
+}
+
+.alltime-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+.alltime-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.alltime-card-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px 9px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.alltime-mode-name {
+  font-size: 0.70rem;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.58);
+}
+
+.alltime-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.alltime-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.alltime-row:last-child { border-bottom: none; }
+
+/* Podium row tints */
+.alltime-row--1st {
+  background: linear-gradient(90deg, rgba(255,215,0,0.11) 0%, transparent 75%);
+}
+.alltime-row--2nd {
+  background: linear-gradient(90deg, rgba(192,192,192,0.07) 0%, transparent 75%);
+}
+.alltime-row--3rd {
+  background: linear-gradient(90deg, rgba(205,127,50,0.08) 0%, transparent 75%);
+}
+
+.alltime-rank {
+  font-size: 0.88rem;
+  text-align: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.alltime-player {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.80);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.alltime-score {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.86);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.alltime-date {
+  font-size: 0.66rem;
+  color: rgba(255,255,255,0.30);
+  flex-shrink: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Podium accent colours */
+.alltime-row--1st .alltime-player { color: rgba(255,215,0,0.88); }
+.alltime-row--1st .alltime-score  { color: rgba(255,220,0,0.96); }
+.alltime-row--2nd .alltime-player { color: rgba(220,220,220,0.84); }
+.alltime-row--2nd .alltime-score  { color: rgba(224,224,224,0.92); }
+.alltime-row--3rd .alltime-player { color: rgba(225,148,80,0.84); }
+.alltime-row--3rd .alltime-score  { color: rgba(225,148,80,0.92); }
+
+.alltime-empty {
+  text-align: center;
+  color: rgba(255,255,255,0.35);
+  font-size: 0.85rem;
+  padding: 32px 0;
+}
+
 /* ── Colour Mode — HSV Picker ────────────────────────────────────────────── */
 
 /*

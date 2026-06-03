@@ -122,3 +122,19 @@ export async function getRoomScores(roomId: string): Promise<ScoreRow[]> {
   if (error) throw toError(error);
   return (data ?? []) as ScoreRow[];
 }
+
+/**
+ * Fetch all scores across every room (no room_id filter).
+ * Used to build the all-time top-5 leaderboard per game mode.
+ * A practical limit of 5000 rows covers any realistic dataset;
+ * client-side grouping and sorting then builds the top-5 cards.
+ */
+export async function getAllTimeTopScores(): Promise<ScoreRow[]> {
+  const { data, error } = await supabase
+    .from('scores')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(5000);
+  if (error) throw toError(error);
+  return (data ?? []) as ScoreRow[];
+}

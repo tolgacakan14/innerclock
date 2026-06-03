@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getRoomByCode, getRoomScores, type ScoreRow, type RoomRow } from '../lib/roomScores';
+import { getRoomByCode, getRoomScores, getAllTimeTopScores, type ScoreRow, type RoomRow } from '../lib/roomScores';
 import { loadRoomPlayer } from '../lib/roomStorage';
 
 // ── Filter types ──────────────────────────────────────────────────────────────
 
 type ModeFilter =
   | 'Form'
+  | 'All-Time'
   | 'All'
   | 'Time Mode'
   | 'Colour Mode'
@@ -20,12 +21,13 @@ type ModeFilter =
 
 // 'Form' is first — it is the default selected tab
 const FILTERS: ModeFilter[] = [
-  'Form', 'All', 'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode',
+  'Form', 'All-Time', 'All', 'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode',
   'Grandma Walking', 'Arrow Escape', 'Sequence Tap', 'Memory Grid', 'Tap Timing',
 ];
 
 const FILTER_SHORT: Record<ModeFilter, string> = {
   'Form':            '🏆 Form',
+  'All-Time':        '⭐ All-Time',
   'All':             'All',
   'Time Mode':       'Time',
   'Colour Mode':     'Colour',
@@ -37,6 +39,12 @@ const FILTER_SHORT: Record<ModeFilter, string> = {
   'Memory Grid':     'Memory',
   'Tap Timing':      'Timing',
 };
+
+// Game modes in display order (meta-tabs excluded)
+const GAME_MODE_FILTERS: ModeFilter[] = [
+  'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode',
+  'Grandma Walking', 'Arrow Escape', 'Sequence Tap', 'Memory Grid', 'Tap Timing',
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -53,6 +61,15 @@ function fmtDateTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
     ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Compact date — "Today 18:42" or "03 Jun 18:42" */
+function fmtDateCompact(iso: string): string {
+  const d    = new Date(iso);
+  const now  = new Date();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return `Today ${time}`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
 }
 
 function rankLabel(i: number) {
@@ -155,6 +172,74 @@ function FormSection({ entries, myPlayerId }: { entries: FormEntry[]; myPlayerId
   );
 }
 
+// ── All-Time top-5 per mode ───────────────────────────────────────────────────
+
+const AT_RANK_ICONS = ['🥇', '🥈', '🥉'];
+
+function AllTimeSection({ scores }: { scores: ScoreRow[] }) {
+  // Group all scores by mode
+  const byMode = new Map<string, ScoreRow[]>();
+  for (const s of scores) {
+    const arr = byMode.get(s.mode) ?? [];
+    arr.push(s);
+    byMode.set(s.mode, arr);
+  }
+
+  // Build sorted top-5 cards in a fixed display order
+  const cards: { mode: string; top5: ScoreRow[] }[] = [];
+  for (const mode of GAME_MODE_FILTERS) {
+    const modeScores = byMode.get(mode) ?? [];
+    if (modeScores.length === 0) continue;
+    const isLower = modeScores[0].score_type === 'lower_is_better';
+    const sorted  = [...modeScores].sort((a, b) =>
+      isLower ? a.score_value - b.score_value : b.score_value - a.score_value
+    );
+    cards.push({ mode, top5: sorted.slice(0, 5) });
+  }
+
+  if (cards.length === 0) {
+    return (
+      <p className="alltime-empty">
+        No all-time scores yet — play a game and submit your result!
+      </p>
+    );
+  }
+
+  return (
+    <div className="alltime-wrap">
+      {cards.map(({ mode, top5 }) => (
+        <div key={mode} className="alltime-card">
+          <div className="alltime-card-header">
+            <span className="alltime-mode-name">
+              {mode.replace(' Mode', '').replace(' Walking', '')}
+            </span>
+          </div>
+          <div className="alltime-rows">
+            {top5.map((s, i) => (
+              <div
+                key={s.id}
+                className={[
+                  'alltime-row',
+                  i === 0 ? 'alltime-row--1st' : '',
+                  i === 1 ? 'alltime-row--2nd' : '',
+                  i === 2 ? 'alltime-row--3rd' : '',
+                ].filter(Boolean).join(' ')}
+              >
+                <span className="alltime-rank">
+                  {AT_RANK_ICONS[i] ?? `${i + 1}`}
+                </span>
+                <span className="alltime-player">{s.player_name}</span>
+                <span className="alltime-score">{s.score_label}</span>
+                <span className="alltime-date">{fmtDateCompact(s.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Normal score section ──────────────────────────────────────────────────────
 
 interface SectionProps { mode: ModeFilter; scores: ScoreRow[] }
@@ -196,12 +281,13 @@ export default function RoomScoreboardScreen() {
   const navigate     = useNavigate();
   const code         = (roomCode ?? '').toUpperCase();
 
-  const [room,     setRoom]     = useState<RoomRow | null>(null);
-  const [scores,   setScores]   = useState<ScoreRow[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState<ModeFilter>('Form');  // Form is default
-  const [copied,   setCopied]   = useState(false);
-  const [notFound, setNotFound] = useState(false);
+  const [room,          setRoom]          = useState<RoomRow | null>(null);
+  const [scores,        setScores]        = useState<ScoreRow[]>([]);
+  const [allTimeScores, setAllTimeScores] = useState<ScoreRow[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [filter,        setFilter]        = useState<ModeFilter>('Form');  // Form is default
+  const [copied,        setCopied]        = useState(false);
+  const [notFound,      setNotFound]      = useState(false);
 
   const inviteUrl = `${window.location.origin}/room/${code}`;
   const savedCtx  = loadRoomPlayer(code);
@@ -213,8 +299,13 @@ export default function RoomScoreboardScreen() {
       const r = await getRoomByCode(code);
       if (!r) { setNotFound(true); setLoading(false); return; }
       setRoom(r);
-      const s = await getRoomScores(r.id);
+      // Fetch room scores and all-time scores in parallel
+      const [s, at] = await Promise.all([
+        getRoomScores(r.id),
+        getAllTimeTopScores(),
+      ]);
       setScores(s);
+      setAllTimeScores(at);
     } catch {
       // silently fail
     } finally {
@@ -287,8 +378,9 @@ export default function RoomScoreboardScreen() {
               aria-selected={filter === f}
               className={[
                 'sb-tab',
-                filter === f ? 'sb-tab--active' : '',
-                f === 'Form'  ? 'sb-tab--form'   : '',
+                filter === f   ? 'sb-tab--active'  : '',
+                f === 'Form'   ? 'sb-tab--form'    : '',
+                f === 'All-Time' ? 'sb-tab--alltime' : '',
               ].filter(Boolean).join(' ')}
               onClick={() => setFilter(f)}
             >
@@ -316,9 +408,17 @@ export default function RoomScoreboardScreen() {
               </div>
               <FormSection entries={formEntries} myPlayerId={myId} />
             </>
+          ) : filter === 'All-Time' ? (
+            <>
+              <div className="form-header">
+                <p className="form-header-title">All-Time Top 5</p>
+                <p className="form-header-sub">Best scores ever — across all rooms</p>
+              </div>
+              <AllTimeSection scores={allTimeScores} />
+            </>
           ) : filter === 'All' ? (
             // Show each mode as separate section
-            FILTERS.filter(f => f !== 'All' && f !== 'Form').map(mode => {
+            FILTERS.filter(f => f !== 'All' && f !== 'Form' && f !== 'All-Time').map(mode => {
               const modeScores = scores.filter(s => s.mode === mode);
               if (modeScores.length === 0) return null;
               return <ScoreSection key={mode} mode={mode} scores={modeScores} />;
