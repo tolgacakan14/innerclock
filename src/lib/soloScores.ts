@@ -22,14 +22,14 @@ export function soloScoreType(mode: string): 'lower_is_better' | 'higher_is_bett
   return SOLO_LOWER_IS_BETTER.has(mode) ? 'lower_is_better' : 'higher_is_better';
 }
 
-/** Display order of modes on the Solo All-Time leaderboard. */
+/** Display order of modes on the Solo All-Time leaderboard (matches game menu order). */
 export const SOLO_MODE_LIST = [
-  'Rush Mode',
+  'Time Mode',
   'Colour Mode',
+  'Rush Mode',
   'Golf Mode',
   'Grandma Walking',
   'Arrow Escape',
-  'Time Mode',
   'Sequence Tap',
   'Memory Grid',
   'Tap Timing',

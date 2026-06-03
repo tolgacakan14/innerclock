@@ -10,7 +10,7 @@
  *   rush    →  /audio/rush.mp3              (Rush mode)
  *   grandma →  /audio/grandma-walk.mp3      (Grandma Walking)
  *   golf    →  /audio/golf.mp3              (Golf mode)
- *   time    →  /audio/time-mode.mp3         (Time mode)
+ *   time    →  /audio/timemode.mp3           (Time mode)
  *
  * Usage:
  *   musicManager.toggle()              — flip on/off (with fade)
@@ -33,7 +33,7 @@ const TRACKS: Record<TrackKey, string[]> = {
   rush:    ['/audio/rush.mp3',            '/audio/background-loop.mp3'],
   grandma: ['/audio/grandma-walk.mp3',   '/audio/grandma%20walk.mp3', '/audio/background-loop.mp3'],
   golf:    ['/audio/golf.mp3',            '/audio/background-loop.mp3'],
-  time:    ['/audio/time-mode.mp3',       '/audio/background-loop.mp3'],
+  time:    ['/audio/timemode.mp3',         '/audio/background-loop.mp3'],
 };
 
 const DEFAULT_VOLUME = 0.35;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getSoloLeaderboard,
   SOLO_MODE_LIST,
@@ -58,46 +58,58 @@ export default function SoloLeaderboardScreen({ onBack }: Props) {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [errMsg,     setErrMsg]     = useState<string | null>(null);
 
-  // Client-side cache so switching tabs doesn't re-fetch already-loaded data
+  // Client-side cache — avoids re-fetching already-loaded tabs
   const [cache] = useState<Map<string, SoloScoreRow[]>>(() => new Map());
 
+  // Refs for scrolling the active tab into view
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const activeTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  // Fetch leaderboard whenever active mode changes
   useEffect(() => {
     const hit = cache.get(activeMode);
     if (hit) {
       setRows(hit);
       setFetchState('done');
-      return;
+    } else {
+      let cancelled = false;
+      setFetchState('loading');
+      setErrMsg(null);
+
+      getSoloLeaderboard(activeMode)
+        .then(data => {
+          if (cancelled) return;
+          cache.set(activeMode, data);
+          setRows(data);
+          setFetchState('done');
+        })
+        .catch(err => {
+          if (cancelled) return;
+          const msg = err instanceof Error ? err.message : String(err);
+          setErrMsg(
+            msg.startsWith('TABLE_MISSING')
+              ? 'Leaderboard table not set up yet. Run the SQL migration.'
+              : 'Could not load scores.',
+          );
+          setFetchState('error');
+        });
+
+      return () => { cancelled = true; };
     }
-
-    let cancelled = false;
-    setFetchState('loading');
-    setErrMsg(null);
-
-    getSoloLeaderboard(activeMode)
-      .then(data => {
-        if (cancelled) return;
-        cache.set(activeMode, data);
-        setRows(data);
-        setFetchState('done');
-      })
-      .catch(err => {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : String(err);
-        setErrMsg(
-          msg.startsWith('TABLE_MISSING')
-            ? 'Leaderboard table not set up yet. Run the SQL migration.'
-            : 'Could not load scores.',
-        );
-        setFetchState('error');
-      });
-
-    return () => { cancelled = true; };
   }, [activeMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll the active tab button into view whenever it changes
+  useEffect(() => {
+    const btn = activeTabRefs.current.get(activeMode);
+    if (btn && tabsScrollRef.current) {
+      btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeMode]);
 
   const isLower = SOLO_LOWER_IS_BETTER.has(activeMode);
 
   return (
-    <div className="screen solo-lb-screen">
+    <div className="solo-lb-screen">
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="solo-lb-header">
@@ -108,14 +120,18 @@ export default function SoloLeaderboardScreen({ onBack }: Props) {
         </div>
       </div>
 
-      {/* ── Mode tabs ───────────────────────────────────────────── */}
-      <div className="solo-lb-tabs-wrap">
+      {/* ── Mode tabs — horizontally scrollable ─────────────────── */}
+      <div className="solo-lb-tabs-wrap" ref={tabsScrollRef}>
         <div className="solo-lb-tabs" role="tablist">
           {SOLO_MODE_LIST.map(mode => (
             <button
               key={mode}
               role="tab"
               aria-selected={activeMode === mode}
+              ref={el => {
+                if (el) activeTabRefs.current.set(mode, el);
+                else activeTabRefs.current.delete(mode);
+              }}
               className={[
                 'solo-lb-tab',
                 activeMode === mode ? 'solo-lb-tab--active' : '',

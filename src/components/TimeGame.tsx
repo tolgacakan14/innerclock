@@ -8,6 +8,7 @@ import TimeResultsScreen from './TimeResultsScreen';
 import { calcScore, randomTarget, makeGameRng, makeDailyRng } from '../utils';
 import type { Round, RoomContext, DailyContext } from '../types';
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
+import { musicManager } from '../audio';
 
 type TimeScreen = 'start' | 'countdown' | 'observe' | 'reproduce' | 'feedback' | 'results';
 
@@ -20,7 +21,12 @@ interface Props {
 
 export default function TimeGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack } = useBackgroundMusic();
-  useEffect(() => { setTrack('time'); }, []);
+
+  // Switch to time track once on mount; restore main track on unmount
+  useEffect(() => {
+    setTrack('time');
+    return () => { musicManager.unsilence(); }; // ensure not silenced if unmounted mid-round
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // In room/daily mode skip the start screen — generate targets immediately
   const [targets, setTargets] = useState<number[]>(() => {
@@ -39,6 +45,17 @@ export default function TimeGame({ playerName, onExit, roomContext, dailyContext
   const [rounds,        setRounds]        = useState<Round[]>([]);
   const [currentRound,  setCurrentRound]  = useState(0);
   const [pendingActual, setPendingActual] = useState(0);
+
+  // Pause time music during the between-round feedback screen and the start/results
+  // screens; resume when active gameplay phases (countdown → observe → reproduce) begin.
+  useEffect(() => {
+    if (screen === 'feedback' || screen === 'start' || screen === 'results') {
+      musicManager.silence();
+    } else {
+      // countdown, observe, reproduce — active gameplay
+      musicManager.unsilence();
+    }
+  }, [screen]);
 
   function handleExit() {
     setTrack('main');
