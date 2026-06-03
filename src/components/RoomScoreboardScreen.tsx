@@ -19,9 +19,9 @@ type ModeFilter =
   | 'Memory Grid'
   | 'Tap Timing';
 
-// 'Form' is first — it is the default selected tab
+// 'All-Time' is first visually; 'All' is the default selected tab
 const FILTERS: ModeFilter[] = [
-  'Form', 'All-Time', 'All', 'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode',
+  'All-Time', 'Form', 'All', 'Time Mode', 'Colour Mode', 'Rush Mode', 'Golf Mode',
   'Grandma Walking', 'Arrow Escape', 'Sequence Tap', 'Memory Grid', 'Tap Timing',
 ];
 
@@ -285,7 +285,7 @@ export default function RoomScoreboardScreen() {
   const [scores,        setScores]        = useState<ScoreRow[]>([]);
   const [allTimeScores, setAllTimeScores] = useState<ScoreRow[]>([]);
   const [loading,       setLoading]       = useState(true);
-  const [filter,        setFilter]        = useState<ModeFilter>('Form');  // Form is default
+  const [filter,        setFilter]        = useState<ModeFilter>('All');   // All is default
   const [copied,        setCopied]        = useState(false);
   const [notFound,      setNotFound]      = useState(false);
 

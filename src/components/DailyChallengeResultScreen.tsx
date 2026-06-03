@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   submitDailyChallengeScore,
   getDailyLeaderboard,
@@ -189,24 +189,40 @@ export default function DailyChallengeResultScreen({
   const [lbErrorMsg,    setLbErrorMsg]    = useState<string | null>(null);
   const [showAllScores, setShowAllScores] = useState(false);
 
+  // ── Duplicate-submit guard ────────────────────────────────────────────────
+  // useRef values persist across React StrictMode's intentional remount cycle,
+  // unlike local `cancelled` variables which reset on every effect invocation.
+  // submittedRef   — true once the INSERT has successfully completed
+  // saveInProgress — true while the INSERT is in flight
+  const submittedRef      = useRef(false);
+  const saveInProgressRef = useRef(false);
+
   const myName    = playerName.trim() || 'Anonymous';
   const dateLabel = formatLocalDate();
   const message   = getMessage(totalScore);
 
   // ── Submit + load compact leaderboard on mount ────────────────────────────
   useEffect(() => {
+    // `cancelled` guards the leaderboard fetch (read-only, idempotent).
+    // It does NOT guard the submit — submit state updates must still fire
+    // even if the cleanup ran while the INSERT was in flight (React 18 no
+    // longer warns about setState on unmounted components).
     let cancelled = false;
 
     async function run() {
-      // 1. Submit score
-      const gamesPlayed = gameResults.map(r => r.mode);
-      try {
-        await submitDailyChallengeScore(myName, totalScore, gameResults, gamesPlayed);
-        if (!cancelled) setSubmitStatus('done');
-      } catch (err) {
-        const raw = err instanceof Error ? err.message : String(err);
-        if (!cancelled) {
-          setSubmitStatus('error');
+      // ── 1. Submit score (exactly once) ─────────────────────────────────
+      // Both refs survive React StrictMode's mount → cleanup → remount cycle,
+      // so the second invocation sees the first run's in-progress / done flag.
+      if (!submittedRef.current && !saveInProgressRef.current) {
+        saveInProgressRef.current = true;
+        const gamesPlayed = gameResults.map(r => r.mode);
+        try {
+          await submitDailyChallengeScore(myName, totalScore, gameResults, gamesPlayed);
+          submittedRef.current = true;
+          setSubmitStatus('done');      // intentionally no cancelled check
+        } catch (err) {
+          const raw = err instanceof Error ? err.message : String(err);
+          setSubmitStatus('error');     // intentionally no cancelled check
           if (raw.startsWith('TABLE_MISSING')) {
             setSubmitError('Daily leaderboard table not set up yet.');
             setSubmitDetail('Run the SQL migration in your Supabase SQL Editor to enable saving.');
@@ -217,10 +233,12 @@ export default function DailyChallengeResultScreen({
             setSubmitError('Could not save score.');
             setSubmitDetail(import.meta.env.DEV ? raw : null);
           }
+        } finally {
+          saveInProgressRef.current = false;
         }
       }
 
-      // 2. Load compact leaderboard (best-per-player)
+      // ── 2. Load compact leaderboard (best-per-player, reads are safe) ──
       try {
         const raw = await getDailyLeaderboard();
         if (!cancelled) {
