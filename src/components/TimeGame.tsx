@@ -22,10 +22,12 @@ interface Props {
 export default function TimeGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack } = useBackgroundMusic();
 
-  // Switch to time track once on mount; restore main track on unmount
+  // Switch to time track once on mount.
+  // We do NOT call silence/unsilence here — those are called directly in the
+  // handler functions below so they never race with the async setTrack operation.
   useEffect(() => {
     setTrack('time');
-    return () => { musicManager.unsilence(); }; // ensure not silenced if unmounted mid-round
+    // no cleanup: handleExit() calls setTrack('main') explicitly
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // In room/daily mode skip the start screen — generate targets immediately
@@ -46,17 +48,6 @@ export default function TimeGame({ playerName, onExit, roomContext, dailyContext
   const [currentRound,  setCurrentRound]  = useState(0);
   const [pendingActual, setPendingActual] = useState(0);
 
-  // Pause time music during the between-round feedback screen and the start/results
-  // screens; resume when active gameplay phases (countdown → observe → reproduce) begin.
-  useEffect(() => {
-    if (screen === 'feedback' || screen === 'start' || screen === 'results') {
-      musicManager.silence();
-    } else {
-      // countdown, observe, reproduce — active gameplay
-      musicManager.unsilence();
-    }
-  }, [screen]);
-
   function handleExit() {
     setTrack('main');
     onExit();
@@ -68,6 +59,7 @@ export default function TimeGame({ playerName, onExit, roomContext, dailyContext
     setTargets(Array.from({ length: 5 }, () => randomTarget(rng)));
     setRounds([]);
     setCurrentRound(0);
+    musicManager.unsilence(); // resume if silenced from a previous feedback/results screen
     setScreen('countdown');
   }
 
@@ -76,6 +68,7 @@ export default function TimeGame({ playerName, onExit, roomContext, dailyContext
 
   function handleReproduce(actual: number) {
     setPendingActual(actual);
+    musicManager.silence(); // pause time music while showing per-round feedback
     setScreen('feedback');
   }
 
@@ -96,8 +89,10 @@ export default function TimeGame({ playerName, onExit, roomContext, dailyContext
       } else {
         setScreen('results');
       }
+      // music stays silent on results screen; handleExit → setTrack('main') cleans up
     } else {
       setCurrentRound(r => r + 1);
+      musicManager.unsilence(); // resume time music for next round
       setScreen('countdown');
     }
   }
