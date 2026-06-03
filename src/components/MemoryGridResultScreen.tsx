@@ -69,7 +69,7 @@ export default function MemoryGridResultScreen({
           roomContext={roomContext}
           mode="Memory Grid"
           scoreValue={score}
-          scoreLabel={`${score} pts`}
+          scoreLabel={`Level ${completedRounds + 1} — ${score} pts`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
         />
@@ -79,7 +79,7 @@ export default function MemoryGridResultScreen({
         <SoloScoreSubmit
           mode="Memory Grid"
           scoreValue={score}
-          scoreLabel={`${score} pts`}
+          scoreLabel={`Level ${completedRounds + 1} — ${score} pts`}
           scoreType="higher_is_better"
           playerName={playerName}
         />

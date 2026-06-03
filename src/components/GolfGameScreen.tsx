@@ -234,8 +234,11 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   // aimAnchorRef — where the player's finger first landed (stays fixed for the whole drag).
   // aimCurrentRef — follows the finger during the drag.
   // Shot direction = (anchor → current) reversed; deadzone = dist(anchor, current).
-  const aimAnchorRef  = useRef<{ x: number; y: number } | null>(null);
-  const aimCurrentRef = useRef<{ x: number; y: number } | null>(null);
+  // aimPointerIdRef — the pointerId that initiated the aim; used to ignore stray
+  //   second-finger events that would otherwise corrupt or prematurely end the aim.
+  const aimAnchorRef    = useRef<{ x: number; y: number } | null>(null);
+  const aimCurrentRef   = useRef<{ x: number; y: number } | null>(null);
+  const aimPointerIdRef = useRef<number | null>(null);
   const [aimAnchor,   setAimAnchor]  = useState<{ x: number; y: number } | null>(null);
   const [aimDisplay,  setAimDisplay] = useState<{ x: number; y: number } | null>(null);
 
@@ -356,6 +359,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     // edge of the tap zone no longer creates an instant wrong-direction aim.
     aimAnchorRef.current  = { x: pt.x, y: pt.y };
     aimCurrentRef.current = { x: pt.x, y: pt.y };
+    aimPointerIdRef.current = e.pointerId;
     setAimAnchor({ x: pt.x, y: pt.y });
     setAimDisplay({ x: pt.x, y: pt.y });
     // Capture pointer so drag continues even when finger leaves the SVG element
@@ -364,13 +368,21 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     if (phaseRef.current !== 'aiming') return;
+    // Ignore stray events from a second finger that touched after the aim started
+    if (e.pointerId !== aimPointerIdRef.current) return;
     const pt = toSVGPoint(e.clientX, e.clientY);
     if (!pt) return;
     aimCurrentRef.current = pt;
     setAimDisplay(pt);
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent<SVGSVGElement>) {
+    // Ignore events from pointers other than the one that initiated the aim.
+    // Without this guard a second finger's pointerup would prematurely reset the
+    // scale and corrupt the aim while the first finger is still dragging.
+    if (aimPointerIdRef.current !== null && e.pointerId !== aimPointerIdRef.current) return;
+    aimPointerIdRef.current = null;
+
     // Reset scale only — aimOrigin is intentionally kept unchanged.
     // Changing the origin simultaneously with the scale-back animation would
     // make the field appear to drift/slide, which feels broken.
@@ -409,6 +421,16 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     setShots(newShots);
     phaseRef.current = 'rolling';
     setPhase('rolling');
+  }
+
+  // Safety-net: fires when the pointer leaves the SVG element without the browser
+  // dispatching pointerup/pointercancel (e.g. pointer-capture silently lost on
+  // some mobile browsers).  With active capture this event is suppressed, so it
+  // only triggers in exactly the edge-case it is meant to protect against.
+  function handlePointerLeave(e: React.PointerEvent<SVGSVGElement>) {
+    if (phaseRef.current === 'aiming' && e.pointerId === aimPointerIdRef.current) {
+      handlePointerUp(e);
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -459,6 +481,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
         >
           <defs>
             <radialGradient id="ballGrad" cx="35%" cy="28%" r="65%">
