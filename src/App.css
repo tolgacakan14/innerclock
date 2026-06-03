@@ -6951,3 +6951,172 @@ body {
   flex-direction: column;
   gap: 10px;
 }
+
+/* ── All Scores trigger button ──────────────────────────────────────────────── */
+.dc-allscores-trigger {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 11px 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 196, 0, 0.30);
+  border-radius: 10px;
+  color: rgba(255, 196, 0, 0.85);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dc-allscores-trigger:active {
+  background: rgba(255, 196, 0, 0.08);
+  border-color: rgba(255, 196, 0, 0.55);
+}
+
+/* ── All Scores overlay + bottom sheet ──────────────────────────────────────── */
+.dc-allscores-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: flex-end;
+  z-index: 300;
+  animation: dc-overlay-in 0.18s ease;
+}
+@keyframes dc-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.dc-allscores-sheet {
+  width: 100%;
+  max-height: 82vh;
+  background: #12121e;
+  border-top: 1px solid rgba(255, 196, 0, 0.18);
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: dc-sheet-in 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes dc-sheet-in {
+  from { transform: translateY(60px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.dc-allscores-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid rgba(255, 196, 0, 0.12);
+  flex-shrink: 0;
+}
+
+.dc-allscores-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffc400;
+  letter-spacing: 0.01em;
+}
+
+.dc-allscores-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.dc-allscores-close:active {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dc-allscores-list {
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 24px;
+}
+
+.dc-allscores-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.dc-allscores-empty {
+  text-align: center;
+  padding: 32px 20px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.dc-allscores-count {
+  text-align: center;
+  padding: 12px 20px 4px;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.72rem;
+  margin: 0;
+}
+
+.dc-allscores-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto 52px;
+  align-items: center;
+  gap: 0 6px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.1s;
+}
+
+.dc-allscores-row--1st {
+  background: rgba(255, 196, 0, 0.09);
+}
+.dc-allscores-row--2nd {
+  background: rgba(192, 192, 192, 0.06);
+}
+.dc-allscores-row--me {
+  outline: 1px solid rgba(255, 196, 0, 0.25);
+  outline-offset: -1px;
+  border-radius: 4px;
+}
+
+.dc-allscores-rank {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  min-width: 0;
+}
+.dc-allscores-row--1st .dc-allscores-rank { color: #ffc400; }
+.dc-allscores-row--2nd .dc-allscores-rank { color: #b0b8c8; }
+
+.dc-allscores-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dc-allscores-score {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffc400;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dc-allscores-time {
+  font-size: 0.70rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: right;
+  white-space: nowrap;
+}

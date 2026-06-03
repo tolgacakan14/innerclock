@@ -44,10 +44,10 @@ export function getTodayUTC(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-/** Human-readable local date label, e.g. "Wednesday, 4 June". */
+/** Human-readable English date label, e.g. "Wednesday, June 4". */
 export function formatLocalDate(): string {
-  return new Date().toLocaleDateString(undefined, {
-    weekday: 'long', day: 'numeric', month: 'long',
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric',
   });
 }
 
@@ -221,6 +221,34 @@ export async function getDailyLeaderboard(
     .limit(200);
   if (error) {
     console.error('[DailyChallenge] Leaderboard fetch error:', {
+      message: error.message,
+      code:    error.code,
+      details: error.details,
+      hint:    error.hint,
+    });
+    throw toError(error);
+  }
+  return (data ?? []) as DailyChallengeRecord[];
+}
+
+/**
+ * Fetch ALL Daily Challenge attempts for a given UTC date (no deduplication).
+ * Ordered by final_score DESC, then completed_at ASC as tie-breaker.
+ * Used for the full "All Scores" view.
+ */
+export async function getAllDailyScores(
+  dateStr?: string,
+): Promise<DailyChallengeRecord[]> {
+  const date = dateStr ?? getTodayUTC();
+  const { data, error } = await supabase
+    .from('daily_challenge_scores')
+    .select('*')
+    .eq('daily_date', date)
+    .order('final_score', { ascending: false })
+    .order('completed_at', { ascending: true })
+    .limit(500);
+  if (error) {
+    console.error('[DailyChallenge] All scores fetch error:', {
       message: error.message,
       code:    error.code,
       details: error.details,

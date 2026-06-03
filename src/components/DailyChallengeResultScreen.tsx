@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   submitDailyChallengeScore,
   getDailyLeaderboard,
+  getAllDailyScores,
   deduplicateLeaderboard,
   formatLocalDate,
   type DailyGameResult,
@@ -36,12 +37,17 @@ function getMessage(score: number): string {
   return 'Every day is a chance to improve.';
 }
 
+/** Format an ISO timestamp as English 24-hour HH:MM, e.g. "18:42". */
 function fmtTime(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-US', {
+    hour:   '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
-// ── Leaderboard row ───────────────────────────────────────────────────────────
+// ── Compact leaderboard row ───────────────────────────────────────────────────
 
 function LBRow({
   record, rank, isMe,
@@ -62,6 +68,111 @@ function LBRow({
   );
 }
 
+// ── All Scores bottom sheet ───────────────────────────────────────────────────
+
+type AllScoresState = 'idle' | 'loading' | 'done' | 'error';
+
+function AllScoresSheet({
+  myName,
+  onClose,
+}: {
+  myName: string;
+  onClose: () => void;
+}) {
+  const [state,  setState]  = useState<AllScoresState>('loading');
+  const [rows,   setRows]   = useState<DailyChallengeRecord[]>([]);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllDailyScores()
+      .then(data => {
+        if (!cancelled) { setRows(data); setState('done'); }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setErrMsg(err instanceof Error ? err.message : String(err));
+          setState('error');
+        }
+      });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prevent background scroll while sheet is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  return (
+    <div className="dc-allscores-overlay" onClick={onClose}>
+      <div
+        className="dc-allscores-sheet"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="dc-allscores-header">
+          <span className="dc-allscores-title">Daily Challenge — All Scores</span>
+          <button className="dc-allscores-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="dc-allscores-list">
+          {state === 'loading' && (
+            <div className="dc-allscores-loading">
+              <div className="room-loading-spinner" />
+            </div>
+          )}
+
+          {state === 'error' && (
+            <p className="dc-allscores-empty">
+              {errMsg?.startsWith('TABLE_MISSING')
+                ? 'Table not set up yet.'
+                : 'Could not load scores.'}
+            </p>
+          )}
+
+          {state === 'done' && rows.length === 0 && (
+            <p className="dc-allscores-empty">No scores yet today.</p>
+          )}
+
+          {state === 'done' && rows.length > 0 && rows.map((r, i) => {
+            const isMe = r.player_name === myName;
+            const is1st = i === 0;
+            const is2nd = i === 1;
+            return (
+              <div
+                key={r.id}
+                className={[
+                  'dc-allscores-row',
+                  is1st ? 'dc-allscores-row--1st' : '',
+                  is2nd ? 'dc-allscores-row--2nd' : '',
+                  isMe  ? 'dc-allscores-row--me'  : '',
+                ].filter(Boolean).join(' ')}
+              >
+                <span className="dc-allscores-rank">
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : `#${i + 1}`}
+                </span>
+                <span className="dc-allscores-name">
+                  {r.player_name}{isMe ? ' · you' : ''}
+                </span>
+                <span className="dc-allscores-score">{r.final_score}</span>
+                <span className="dc-allscores-time">{fmtTime(r.completed_at)}</span>
+              </div>
+            );
+          })}
+
+          {state === 'done' && rows.length > 0 && (
+            <p className="dc-allscores-count">
+              {rows.length} attempt{rows.length !== 1 ? 's' : ''} today
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 type SubmitStatus = 'submitting' | 'done' | 'error';
@@ -76,12 +187,13 @@ export default function DailyChallengeResultScreen({
   const [lbLoading,     setLbLoading]     = useState(true);
   const [lbError,       setLbError]       = useState(false);
   const [lbErrorMsg,    setLbErrorMsg]    = useState<string | null>(null);
+  const [showAllScores, setShowAllScores] = useState(false);
 
   const myName    = playerName.trim() || 'Anonymous';
   const dateLabel = formatLocalDate();
   const message   = getMessage(totalScore);
 
-  // ── Submit + load leaderboard on mount ────────────────────────────────────
+  // ── Submit + load compact leaderboard on mount ────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -95,7 +207,6 @@ export default function DailyChallengeResultScreen({
         const raw = err instanceof Error ? err.message : String(err);
         if (!cancelled) {
           setSubmitStatus('error');
-          // Humanise known sentinel errors
           if (raw.startsWith('TABLE_MISSING')) {
             setSubmitError('Daily leaderboard table not set up yet.');
             setSubmitDetail('Run the SQL migration in your Supabase SQL Editor to enable saving.');
@@ -109,7 +220,7 @@ export default function DailyChallengeResultScreen({
         }
       }
 
-      // 2. Load leaderboard (even if submit failed — show empty state not error)
+      // 2. Load compact leaderboard (best-per-player)
       try {
         const raw = await getDailyLeaderboard();
         if (!cancelled) {
@@ -134,7 +245,7 @@ export default function DailyChallengeResultScreen({
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Find current player rank in leaderboard
+  // Find current player rank in compact (deduped) leaderboard
   const myRankIndex = leaderboard.findIndex(r => r.player_name === myName);
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -189,7 +300,7 @@ export default function DailyChallengeResultScreen({
         )}
       </div>
 
-      {/* Leaderboard */}
+      {/* Compact leaderboard — best per player */}
       <div className="dc-leaderboard">
         <p className="dc-result-section-label dc-lb-header">
           Today's Leaderboard
@@ -216,7 +327,7 @@ export default function DailyChallengeResultScreen({
 
         {!lbLoading && !lbError && leaderboard.length > 0 && (
           <div className="dc-lb-list">
-            {leaderboard.slice(0, 20).map((r, i) => (
+            {leaderboard.slice(0, 10).map((r, i) => (
               <LBRow
                 key={r.id}
                 record={r}
@@ -225,6 +336,16 @@ export default function DailyChallengeResultScreen({
               />
             ))}
           </div>
+        )}
+
+        {/* All Scores trigger — always shown once leaderboard has loaded */}
+        {!lbLoading && (
+          <button
+            className="dc-allscores-trigger"
+            onClick={() => setShowAllScores(true)}
+          >
+            Daily Challenge All Scores
+          </button>
         )}
       </div>
 
@@ -237,6 +358,14 @@ export default function DailyChallengeResultScreen({
           ← Home
         </button>
       </div>
+
+      {/* All Scores bottom sheet */}
+      {showAllScores && (
+        <AllScoresSheet
+          myName={myName}
+          onClose={() => setShowAllScores(false)}
+        />
+      )}
 
     </div>
   );
