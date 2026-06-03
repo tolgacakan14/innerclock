@@ -3,12 +3,13 @@ import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape' | 'sequence' | 'memory' | 'timing';
 
 interface Props {
-  playerName:          string;
-  onSelect:            (mode: GameMode) => void;
-  onChangeName:        () => void;
-  onCreateRoom?:       () => void;
-  onJoinRoom?:         () => void;
-  onDailyChallenge?:   () => void;
+  playerName:           string;
+  onSelect:             (mode: GameMode) => void;
+  onChangeName:         () => void;
+  onCreateRoom?:        () => void;
+  onJoinRoom?:          () => void;
+  onDailyChallenge?:    () => void;
+  onSoloLeaderboard?:   () => void;
 }
 
 // ── Card SVG graphics ─────────────────────────────────────────────────────────
@@ -430,7 +431,7 @@ function ArrowEscapeGraphic() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ModeSelectScreen({ playerName, onSelect, onChangeName, onCreateRoom, onJoinRoom, onDailyChallenge }: Props) {
+export default function ModeSelectScreen({ playerName, onSelect, onChangeName, onCreateRoom, onJoinRoom, onDailyChallenge, onSoloLeaderboard }: Props) {
   const { enabled, toggle } = useBackgroundMusic();
 
   return (
@@ -590,6 +591,24 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
         </button>
 
       </div>
+
+      {/* ── Solo All-Time Leaderboard card ──────────────────────── */}
+      {onSoloLeaderboard && (
+        <button className="solo-atl-card" onClick={onSoloLeaderboard} aria-label="Solo All-Time Leaderboard">
+          <span className="solo-atl-card-icon" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+              <rect x="2"  y="14" width="6"  height="14" rx="2" fill="rgba(255,200,50,0.75)"/>
+              <rect x="12" y="8"  width="6"  height="20" rx="2" fill="rgba(255,200,50,0.95)"/>
+              <rect x="22" y="18" width="6"  height="10" rx="2" fill="rgba(255,200,50,0.60)"/>
+            </svg>
+          </span>
+          <div className="solo-atl-card-body">
+            <span className="solo-atl-card-title">Solo All-Time Leaderboard</span>
+            <span className="solo-atl-card-sub">Top solo scores across every game</span>
+          </div>
+          <span className="solo-atl-card-chevron" aria-hidden="true">›</span>
+        </button>
+      )}
 
       {/* ── Play with Friends ────────────────────────────────────── */}
       {(onCreateRoom || onJoinRoom) && (

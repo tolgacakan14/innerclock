@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { GrandmaRoundResult, RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   rounds:       GrandmaRoundResult[];
@@ -92,6 +93,16 @@ export default function GrandmaResultsScreen({ rounds, playerName, onPlayAgain, 
           scoreLabel={`${total} points`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Grandma Walking"
+          scoreValue={total}
+          scoreLabel={`${total} points`}
+          scoreType="higher_is_better"
+          playerName={playerName}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   score:          number;
@@ -124,6 +125,16 @@ export default function RushResultsScreen({
           scoreLabel={`${score} pts`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Rush Mode"
+          scoreValue={score}
+          scoreLabel={`${score} pts`}
+          scoreType="higher_is_better"
+          playerName={playerName}
         />
       )}
     </div>

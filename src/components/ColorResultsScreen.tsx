@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ColorRound, RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   rounds:       ColorRound[];
@@ -93,6 +94,16 @@ export default function ColorResultsScreen({ rounds, playerName, onPlayAgain, on
           scoreLabel={`${total} / 500`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Colour Mode"
+          scoreValue={total}
+          scoreLabel={`${total} / 500`}
+          scoreType="higher_is_better"
+          playerName={playerName}
         />
       )}
     </div>

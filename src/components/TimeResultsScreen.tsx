@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Round, RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   rounds:       Round[];
@@ -93,6 +94,16 @@ export default function TimeResultsScreen({ rounds, playerName, onPlayAgain, onE
           scoreLabel={`${total} / 500`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Time Mode"
+          scoreValue={total}
+          scoreLabel={`${total} / 500`}
+          scoreType="higher_is_better"
+          playerName={playerName}
         />
       )}
     </div>

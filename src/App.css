@@ -7120,3 +7120,260 @@ body {
   text-align: right;
   white-space: nowrap;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SOLO ALL-TIME LEADERBOARD — home card, submit button, leaderboard screen
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Solo All-Time card on ModeSelectScreen ─────────────────────────────────── */
+.solo-atl-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: rgba(255, 196, 0, 0.055);
+  border: 1px solid rgba(255, 196, 0, 0.22);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.solo-atl-card:active {
+  background: rgba(255, 196, 0, 0.10);
+  border-color: rgba(255, 196, 0, 0.40);
+}
+.solo-atl-card-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 196, 0, 0.10);
+  border-radius: 10px;
+}
+.solo-atl-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.solo-atl-card-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.90);
+  letter-spacing: 0.01em;
+}
+.solo-atl-card-sub {
+  font-size: 0.75rem;
+  color: rgba(255, 196, 0, 0.65);
+}
+.solo-atl-card-chevron {
+  flex-shrink: 0;
+  font-size: 1.4rem;
+  color: rgba(255, 196, 0, 0.50);
+  line-height: 1;
+}
+
+/* ── SoloScoreSubmit (result screen) ────────────────────────────────────────── */
+.solo-submit-wrap {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 196, 0, 0.12);
+  text-align: center;
+}
+.solo-submit-btn {
+  display: inline-block;
+  padding: 12px 28px;
+  background: rgba(255, 196, 0, 0.12);
+  border: 1px solid rgba(255, 196, 0, 0.45);
+  border-radius: 12px;
+  color: rgba(255, 196, 0, 0.95);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.solo-submit-btn:active {
+  background: rgba(255, 196, 0, 0.22);
+}
+.solo-submit-btn--saving {
+  opacity: 0.55;
+  cursor: default;
+}
+.solo-submit-done {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(48, 209, 88, 0.85);
+  padding: 8px 0;
+}
+.solo-submit-error {
+  font-size: 0.78rem;
+  color: rgba(255, 69, 58, 0.80);
+  padding: 8px 0;
+}
+
+/* ── SoloLeaderboardScreen ──────────────────────────────────────────────────── */
+.solo-lb-screen {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.solo-lb-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 12px;
+  flex-shrink: 0;
+}
+.solo-lb-back {
+  flex-shrink: 0;
+  padding: 8px 4px;
+  font-size: 0.88rem;
+}
+.solo-lb-title-block {
+  flex: 1;
+}
+.solo-lb-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffc400;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.solo-lb-subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.40);
+  margin: 2px 0 0;
+}
+
+/* Mode tabs */
+.solo-lb-tabs-wrap {
+  flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0 16px 4px;
+  border-bottom: 1px solid rgba(255, 196, 0, 0.10);
+}
+.solo-lb-tabs-wrap::-webkit-scrollbar { display: none; }
+
+.solo-lb-tabs {
+  display: flex;
+  gap: 6px;
+  width: max-content;
+  padding-bottom: 4px;
+}
+.solo-lb-tab {
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.50);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.solo-lb-tab:active { opacity: 0.75; }
+.solo-lb-tab--active {
+  background: rgba(255, 196, 0, 0.14);
+  border-color: rgba(255, 196, 0, 0.55);
+  color: #ffc400;
+}
+
+/* Sort hint */
+.solo-lb-sort-hint {
+  flex-shrink: 0;
+  font-size: 0.70rem;
+  color: rgba(255, 255, 255, 0.28);
+  margin: 8px 20px 0;
+}
+
+/* Content area */
+.solo-lb-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 0 32px;
+}
+.solo-lb-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+.solo-lb-empty {
+  text-align: center;
+  padding: 40px 24px;
+  color: rgba(255, 255, 255, 0.30);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+/* Leaderboard rows */
+.solo-lb-list {
+  display: flex;
+  flex-direction: column;
+}
+.solo-lb-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto 70px;
+  align-items: center;
+  gap: 0 6px;
+  padding: 11px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.1s;
+}
+.solo-lb-row--1st {
+  background: rgba(255, 196, 0, 0.08);
+}
+.solo-lb-row--2nd {
+  background: rgba(192, 192, 192, 0.05);
+}
+.solo-lb-row--3rd {
+  background: rgba(180, 130, 70, 0.04);
+}
+
+.solo-lb-rank {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.40);
+  min-width: 0;
+}
+.solo-lb-rank--1st { color: #ffc400; }
+.solo-lb-rank--2nd { color: #b0b8c8; }
+
+.solo-lb-player {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.solo-lb-row--1st .solo-lb-player {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.solo-lb-score {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffc400;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.solo-lb-date {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.30);
+  text-align: right;
+  white-space: nowrap;
+}

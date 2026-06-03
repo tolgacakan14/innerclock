@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ArrowEscapeRoundResult, RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   rounds:       ArrowEscapeRoundResult[];
@@ -117,6 +118,16 @@ export default function ArrowEscapeResultsScreen({ rounds, playerName, onPlayAga
           scoreLabel={`${finalTime}s`}
           scoreType="lower_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Arrow Escape"
+          scoreValue={finalTime}
+          scoreLabel={`${finalTime}s`}
+          scoreType="lower_is_better"
+          playerName={playerName}
         />
       )}
     </div>

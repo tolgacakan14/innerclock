@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { GolfRoundResult, RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   rounds:       GolfRoundResult[];
@@ -96,6 +97,16 @@ export default function GolfResultsScreen({ rounds, playerName, onPlayAgain, onE
           scoreLabel={`${total} shots`}
           scoreType="lower_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Golf Mode"
+          scoreValue={total}
+          scoreLabel={`${total} shots`}
+          scoreType="lower_is_better"
+          playerName={playerName}
         />
       )}
     </div>

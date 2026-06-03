@@ -12,6 +12,7 @@ import SequenceTapGame         from './components/SequenceTapGame';
 import MemoryGridGame          from './components/MemoryGridGame';
 import TapTimingGame           from './components/TapTimingGame';
 import DailyChallengeFlow      from './components/DailyChallengeFlow';
+import SoloLeaderboardScreen   from './components/SoloLeaderboardScreen';
 import CreateRoomScreen        from './components/CreateRoomScreen';
 import JoinRoomScreen          from './components/JoinRoomScreen';
 
@@ -22,6 +23,7 @@ type SoloView =
   | 'create-room'
   | 'join-room'
   | 'daily'
+  | 'solo-leaderboard'
   | 'time'
   | 'color'
   | 'rush'
@@ -140,7 +142,14 @@ export default function SoloApp() {
         onCreateRoom={() => setView('create-room')}
         onJoinRoom={() => setView('join-room')}
         onDailyChallenge={() => setView('daily')}
+        onSoloLeaderboard={() => setView('solo-leaderboard')}
       />
+    );
+  }
+
+  if (view === 'solo-leaderboard') {
+    return (
+      <SoloLeaderboardScreen key="solo-leaderboard" onBack={() => setView('home')} />
     );
   }
 

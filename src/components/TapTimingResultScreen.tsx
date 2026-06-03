@@ -1,5 +1,6 @@
 import type { RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   perfects:    number;
@@ -75,6 +76,16 @@ export default function TapTimingResultScreen({
           scoreLabel={`${score} pts`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Tap Timing"
+          scoreValue={score}
+          scoreLabel={`${score} pts`}
+          scoreType="higher_is_better"
+          playerName={playerName}
         />
       )}
     </div>

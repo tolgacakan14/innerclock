@@ -1,5 +1,6 @@
 import type { RoomContext } from '../types';
 import RoomSubmitPanel from './RoomSubmitPanel';
+import SoloScoreSubmit from './SoloScoreSubmit';
 
 interface Props {
   completedRounds:   number;
@@ -71,6 +72,16 @@ export default function MemoryGridResultScreen({
           scoreLabel={`${score} pts`}
           scoreType="higher_is_better"
           onBackToRoom={onExit}
+        />
+      )}
+
+      {!roomContext && (
+        <SoloScoreSubmit
+          mode="Memory Grid"
+          scoreValue={score}
+          scoreLabel={`${score} pts`}
+          scoreType="higher_is_better"
+          playerName={playerName}
         />
       )}
     </div>
