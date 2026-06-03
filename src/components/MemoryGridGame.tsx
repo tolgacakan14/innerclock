@@ -6,12 +6,13 @@ import MemoryGridResultScreen  from './MemoryGridResultScreen';
 type Screen = 'playing' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  import('../types').RoomContext;
+  dailyContext?: import('../types').DailyContext;
 }
 
-export default function MemoryGridGame({ playerName, onExit, roomContext }: Props) {
+export default function MemoryGridGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack }      = useBackgroundMusic();
   const [screen,              setScreen]              = useState<Screen>('playing');
   const [completedRounds,     setCompletedRounds]     = useState(0);
@@ -22,7 +23,11 @@ export default function MemoryGridGame({ playerName, onExit, roomContext }: Prop
     setCompletedRounds(completed);
     setTotalCorrectCells(correct);
     setFinalScore(score);
-    setScreen('results');
+    if (dailyContext) {
+      dailyContext.onComplete(score, `${score} pts`, false);
+    } else {
+      setScreen('results');
+    }
   }
 
   function handlePlayAgain() { setScreen('playing'); }

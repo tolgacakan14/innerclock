@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NameScreen        from './components/NameScreen';
-import ModeSelectScreen  from './components/ModeSelectScreen';
-import TimeGame          from './components/TimeGame';
-import ColorGame         from './components/ColorGame';
-import RushGame          from './components/RushGame';
-import GolfGame          from './components/GolfGame';
-import GrandmaGame       from './components/GrandmaGame';
-import ArrowEscapeGame   from './components/ArrowEscapeGame';
-import SequenceTapGame   from './components/SequenceTapGame';
-import MemoryGridGame    from './components/MemoryGridGame';
-import TapTimingGame     from './components/TapTimingGame';
-import CreateRoomScreen  from './components/CreateRoomScreen';
-import JoinRoomScreen    from './components/JoinRoomScreen';
+import NameScreen              from './components/NameScreen';
+import ModeSelectScreen        from './components/ModeSelectScreen';
+import TimeGame                from './components/TimeGame';
+import ColorGame               from './components/ColorGame';
+import RushGame                from './components/RushGame';
+import GolfGame                from './components/GolfGame';
+import GrandmaGame             from './components/GrandmaGame';
+import ArrowEscapeGame         from './components/ArrowEscapeGame';
+import SequenceTapGame         from './components/SequenceTapGame';
+import MemoryGridGame          from './components/MemoryGridGame';
+import TapTimingGame           from './components/TapTimingGame';
+import DailyChallengeFlow      from './components/DailyChallengeFlow';
+import CreateRoomScreen        from './components/CreateRoomScreen';
+import JoinRoomScreen          from './components/JoinRoomScreen';
 
 type SoloView =
   | 'entry'
@@ -20,6 +21,7 @@ type SoloView =
   | 'home'
   | 'create-room'
   | 'join-room'
+  | 'daily'
   | 'time'
   | 'color'
   | 'rush'
@@ -137,6 +139,17 @@ export default function SoloApp() {
         onChangeName={() => setView('name')}
         onCreateRoom={() => setView('create-room')}
         onJoinRoom={() => setView('join-room')}
+        onDailyChallenge={() => setView('daily')}
+      />
+    );
+  }
+
+  if (view === 'daily') {
+    return (
+      <DailyChallengeFlow
+        key="daily"
+        playerName={playerName}
+        onExit={() => setView('home')}
       />
     );
   }

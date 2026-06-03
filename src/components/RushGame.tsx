@@ -9,17 +9,21 @@ import RushResultsScreen        from './RushResultsScreen';
 type RushScreen = 'intro' | 'countdown' | 'playing' | 'reveal' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  import('../types').RoomContext;
+  dailyContext?: import('../types').DailyContext;
 }
 
-export default function RushGame({ playerName, onExit, roomContext }: Props) {
+export default function RushGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack }                = useBackgroundMusic();
-  // In room mode: skip intro + pre-game countdown → go straight to playing
-  const [screen,          setScreen]          = useState<RushScreen>(roomContext ? 'playing' : 'intro');
-  // Set rush music immediately if starting in room mode (no handleStart called)
-  useEffect(() => { if (roomContext) setTrack('rush'); }, []);
+  // Room mode: skip intro + countdown → playing immediately
+  // Daily mode: skip intro but keep countdown (creates tension, plays rush music)
+  const [screen,          setScreen]          = useState<RushScreen>(
+    roomContext ? 'playing' : dailyContext ? 'countdown' : 'intro',
+  );
+  // Set rush music immediately if starting without the intro/handleStart path
+  useEffect(() => { if (roomContext || dailyContext) setTrack('rush'); }, []);
   const [finalScore,      setFinalScore]      = useState(0);
   const [finalNormalHits, setFinalNormalHits] = useState(0);
   const [finalRushHits,   setFinalRushHits]   = useState(0);
@@ -42,7 +46,13 @@ export default function RushGame({ playerName, onExit, roomContext }: Props) {
     setScreen('reveal');
   }
 
-  function handleRevealContinue() { setScreen('results'); }
+  function handleRevealContinue() {
+    if (dailyContext) {
+      dailyContext.onComplete(finalScore, `${finalScore} pts`, false);
+    } else {
+      setScreen('results');
+    }
+  }
 
   function handlePlayAgain() { setScreen('countdown'); }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { makeGameRng } from '../utils';
-import type { GrandmaRoundResult } from '../types';
+import { makeGameRng, makeDailyRng } from '../utils';
+import type { GrandmaRoundResult, DailyContext } from '../types';
 import { grandmaPatterns }          from '../data/grandmaPatterns';
 import type { GrandmaPattern }       from '../data/grandmaPatterns';
 import { useBackgroundMusic }        from '../hooks/useBackgroundMusic';
@@ -12,9 +12,10 @@ import GrandmaResultsScreen         from './GrandmaResultsScreen';
 type GrandmaScreen = 'intro' | 'playing' | 'roundResult' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  import('../types').RoomContext;
+  dailyContext?: DailyContext;
 }
 
 /** The single Hot Mode pattern (id 16) */
@@ -44,12 +45,19 @@ function pickRandom(arr: GrandmaPattern[], n: number, rng: () => number = Math.r
   return picked;
 }
 
-export default function GrandmaGame({ playerName, onExit, roomContext }: Props) {
+export default function GrandmaGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack }               = useBackgroundMusic();
-  // In room mode: skip intro → go straight to playing, start grandma music
-  const [screen,       setScreen]  = useState<GrandmaScreen>(roomContext ? 'playing' : 'intro');
-  useEffect(() => { if (roomContext) setTrack('grandma'); }, []);
-  const [selected,     setSelected]     = useState(() => pickRandom(grandmaPatterns, 3, makeGameRng(roomContext, 'grandma')));
+  // Room/daily mode: skip intro → go straight to playing, start grandma music
+  const [screen,       setScreen]  = useState<GrandmaScreen>(roomContext || dailyContext ? 'playing' : 'intro');
+  useEffect(() => { if (roomContext || dailyContext) setTrack('grandma'); }, []);
+  // Daily mode: same 3 patterns for all players today
+  const [selected,     setSelected]     = useState(() =>
+    pickRandom(grandmaPatterns, 3,
+      roomContext ? makeGameRng(roomContext, 'grandma') :
+      dailyContext ? makeDailyRng('grandma') :
+      undefined,
+    ),
+  );
   const [currentRound, setCurrentRound] = useState(0);
   const [roundResults,      setRoundResults]      = useState<GrandmaRoundResult[]>([]);
   const [lastScore,         setLastScore]         = useState(0);
@@ -93,7 +101,12 @@ export default function GrandmaGame({ playerName, onExit, roomContext }: Props) 
 
   function handleNextRound() {
     if (currentRound + 1 >= 3) {
-      setScreen('results');
+      if (dailyContext) {
+        const total = roundResults.reduce((s, r) => s + r.score, 0);
+        dailyContext.onComplete(total, `${total} pts`, false);
+      } else {
+        setScreen('results');
+      }
     } else {
       setCurrentRound(prev => prev + 1);
       setScreen('playing');

@@ -6,12 +6,13 @@ import TapTimingResultScreen   from './TapTimingResultScreen';
 type Screen = 'playing' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  import('../types').RoomContext;
+  dailyContext?: import('../types').DailyContext;
 }
 
-export default function TapTimingGame({ playerName, onExit, roomContext }: Props) {
+export default function TapTimingGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack }   = useBackgroundMusic();
   useEffect(() => { setTrack('main'); }, []);
   const [screen,       setScreen]       = useState<Screen>('playing');
@@ -29,7 +30,11 @@ export default function TapTimingGame({ playerName, onExit, roomContext }: Props
     setFinalMisses(misses);
     setFinalMaxCombo(maxCombo);
     setFinalScore(score);
-    setScreen('results');
+    if (dailyContext) {
+      dailyContext.onComplete(score, `${score} pts`, false);
+    } else {
+      setScreen('results');
+    }
   }
 
   function handlePlayAgain() { setScreen('playing'); }

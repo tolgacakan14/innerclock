@@ -5,31 +5,37 @@ import ObserveScreen     from './ObserveScreen';
 import ReproduceScreen   from './ReproduceScreen';
 import FeedbackScreen    from './FeedbackScreen';
 import TimeResultsScreen from './TimeResultsScreen';
-import { calcScore, randomTarget, makeGameRng } from '../utils';
-import type { Round, RoomContext } from '../types';
+import { calcScore, randomTarget, makeGameRng, makeDailyRng } from '../utils';
+import type { Round, RoomContext, DailyContext } from '../types';
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 
 type TimeScreen = 'start' | 'countdown' | 'observe' | 'reproduce' | 'feedback' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  RoomContext;
+  dailyContext?: DailyContext;
 }
 
-export default function TimeGame({ playerName, onExit, roomContext }: Props) {
+export default function TimeGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack } = useBackgroundMusic();
   useEffect(() => { setTrack('time'); }, []);
 
-  // In room mode skip the start screen — generate targets immediately
+  // In room/daily mode skip the start screen — generate targets immediately
   const [targets, setTargets] = useState<number[]>(() => {
     if (roomContext) {
       const rng = makeGameRng(roomContext, 'time');
       return Array.from({ length: 5 }, () => randomTarget(rng));
     }
+    if (dailyContext) {
+      // Daily: deterministic targets so all players see the same durations today
+      const rng = makeDailyRng('time');
+      return Array.from({ length: 5 }, () => randomTarget(rng));
+    }
     return [];
   });
-  const [screen,        setScreen]        = useState<TimeScreen>(roomContext ? 'countdown' : 'start');
+  const [screen,        setScreen]        = useState<TimeScreen>(roomContext || dailyContext ? 'countdown' : 'start');
   const [rounds,        setRounds]        = useState<Round[]>([]);
   const [currentRound,  setCurrentRound]  = useState(0);
   const [pendingActual, setPendingActual] = useState(0);
@@ -67,7 +73,12 @@ export default function TimeGame({ playerName, onExit, roomContext }: Props) {
     setRounds(newRounds);
 
     if (currentRound + 1 >= 5) {
-      setScreen('results');
+      if (dailyContext) {
+        const total = newRounds.reduce((s, r) => s + r.score, 0);
+        dailyContext.onComplete(total, `${total} / 500`, false);
+      } else {
+        setScreen('results');
+      }
     } else {
       setCurrentRound(r => r + 1);
       setScreen('countdown');

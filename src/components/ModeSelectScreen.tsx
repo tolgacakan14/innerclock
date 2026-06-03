@@ -3,11 +3,12 @@ import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
 type GameMode = 'time' | 'color' | 'rush' | 'golf' | 'grandma' | 'arrowEscape' | 'sequence' | 'memory' | 'timing';
 
 interface Props {
-  playerName:    string;
-  onSelect:      (mode: GameMode) => void;
-  onChangeName:  () => void;
-  onCreateRoom?: () => void;
-  onJoinRoom?:   () => void;
+  playerName:          string;
+  onSelect:            (mode: GameMode) => void;
+  onChangeName:        () => void;
+  onCreateRoom?:       () => void;
+  onJoinRoom?:         () => void;
+  onDailyChallenge?:   () => void;
 }
 
 // ── Card SVG graphics ─────────────────────────────────────────────────────────
@@ -429,7 +430,7 @@ function ArrowEscapeGraphic() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ModeSelectScreen({ playerName, onSelect, onChangeName, onCreateRoom, onJoinRoom }: Props) {
+export default function ModeSelectScreen({ playerName, onSelect, onChangeName, onCreateRoom, onJoinRoom, onDailyChallenge }: Props) {
   const { enabled, toggle } = useBackgroundMusic();
 
   return (
@@ -468,6 +469,50 @@ export default function ModeSelectScreen({ playerName, onSelect, onChangeName, o
           Change name
         </button>
       </div>
+
+      {/* ── Daily Challenge premium card ─────────────────────── */}
+      {onDailyChallenge && (
+        <button className="dc-home-card" onClick={onDailyChallenge} aria-label="Daily Challenge">
+          {/* Animated glow layer */}
+          <span className="dc-home-card-glow" aria-hidden="true" />
+
+          {/* Icon */}
+          <span className="dc-home-card-icon" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <circle cx="18" cy="18" r="16" stroke="rgba(255,200,50,0.65)" strokeWidth="1.8"/>
+              <circle cx="18" cy="18" r="10" stroke="rgba(255,200,50,0.40)" strokeWidth="1.2"/>
+              {[0,45,90,135,180,225,270,315].map(deg => {
+                const a = deg * Math.PI / 180;
+                return (
+                  <line
+                    key={deg}
+                    x1={18 + Math.cos(a) * 13}
+                    y1={18 + Math.sin(a) * 13}
+                    x2={18 + Math.cos(a) * 16}
+                    y2={18 + Math.sin(a) * 16}
+                    stroke="rgba(255,200,50,0.80)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+              <circle cx="18" cy="18" r="3" fill="rgba(255,200,50,0.95)"/>
+            </svg>
+          </span>
+
+          {/* Text */}
+          <div className="dc-home-card-body">
+            <span className="dc-home-card-title">Daily Challenge</span>
+            <span className="dc-home-card-sub">Five games. One daily score.</span>
+          </div>
+
+          {/* Badge */}
+          <div className="dc-home-card-badge">
+            <span className="dc-badge-dot" aria-hidden="true" />
+            <span className="dc-badge-text">TODAY</span>
+          </div>
+        </button>
+      )}
 
       {/* ── Card grid ───────────────────────────────────────────── */}
       <div className="home-cards">

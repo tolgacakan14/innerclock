@@ -4,27 +4,33 @@ import ColorObserveScreen  from './ColorObserveScreen';
 import ColorMatchScreen    from './ColorMatchScreen';
 import ColorFeedbackScreen from './ColorFeedbackScreen';
 import ColorResultsScreen  from './ColorResultsScreen';
-import { generateDiverseColorSet, calcColorScore, makeGameRng } from '../utils';
-import type { TargetColor, ColorRound, RoomContext } from '../types';
+import { generateDiverseColorSet, calcColorScore, makeGameRng, makeDailyRng } from '../utils';
+import type { TargetColor, ColorRound, RoomContext, DailyContext } from '../types';
 
 type ColorScreen = 'start' | 'observe' | 'match' | 'feedback' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  RoomContext;
+  dailyContext?: DailyContext;
 }
 
-export default function ColorGame({ playerName, onExit, roomContext }: Props) {
-  // In room mode: skip start screen, generate targets immediately
+export default function ColorGame({ playerName, onExit, roomContext, dailyContext }: Props) {
+  // Room/daily mode: skip start screen, generate targets immediately
   const [targets, setTargets] = useState<TargetColor[]>(() => {
     if (roomContext) {
       const rng = makeGameRng(roomContext, 'color');
       return generateDiverseColorSet(5, rng);
     }
+    if (dailyContext) {
+      // Daily: same target colors for all players today
+      const rng = makeDailyRng('color');
+      return generateDiverseColorSet(5, rng);
+    }
     return [];
   });
-  const [screen,           setScreen]           = useState<ColorScreen>(roomContext ? 'observe' : 'start');
+  const [screen,           setScreen]           = useState<ColorScreen>(roomContext || dailyContext ? 'observe' : 'start');
   const [rounds,           setRounds]           = useState<ColorRound[]>([]);
   const [currentRound,     setCurrentRound]     = useState(0);
   const [pendingSelected,  setPendingSelected]  = useState<TargetColor>({ h: 180, s: 60, l: 50 });
@@ -50,7 +56,12 @@ export default function ColorGame({ playerName, onExit, roomContext }: Props) {
     setRounds(newRounds);
 
     if (currentRound + 1 >= 5) {
-      setScreen('results');
+      if (dailyContext) {
+        const total = newRounds.reduce((s, r) => s + r.score, 0);
+        dailyContext.onComplete(total, `${total} / 500`, false);
+      } else {
+        setScreen('results');
+      }
     } else {
       setCurrentRound(currentRound + 1);
       setScreen('observe');

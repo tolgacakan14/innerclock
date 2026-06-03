@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import type { GolfRoundResult, RoomContext } from '../types';
+import type { GolfRoundResult, RoomContext, DailyContext } from '../types';
 import { golfCourses }           from '../data/golfCourses';
 import { useBackgroundMusic }    from '../hooks/useBackgroundMusic';
-import { makeGameRng }           from '../utils';
+import { makeGameRng, makeDailyRng } from '../utils';
 import GolfIntroScreen            from './GolfIntroScreen';
 import GolfGameScreen             from './GolfGameScreen';
 import GolfRoundCompleteScreen    from './GolfRoundCompleteScreen';
@@ -11,9 +11,10 @@ import GolfResultsScreen          from './GolfResultsScreen';
 type GolfScreen = 'intro' | 'playing' | 'roundComplete' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  RoomContext;
+  dailyContext?: DailyContext;
 }
 
 /** Pick n unique items from an array using provided RNG (defaults to Math.random) */
@@ -26,12 +27,19 @@ function pickRandom<T>(arr: T[], n: number, rng: () => number = Math.random): T[
   return copy.slice(0, n);
 }
 
-export default function GolfGame({ playerName, onExit, roomContext }: Props) {
+export default function GolfGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack }           = useBackgroundMusic();
-  // In room mode: skip intro → go straight to playing, start golf music immediately
-  const [screen,       setScreen]       = useState<GolfScreen>(roomContext ? 'playing' : 'intro');
-  useEffect(() => { if (roomContext) setTrack('golf'); }, []);
-  const [selected,     setSelected]     = useState(() => pickRandom(golfCourses, 5, makeGameRng(roomContext, 'golf')));
+  // Room/daily mode: skip intro → go straight to playing, start golf music immediately
+  const [screen,       setScreen]       = useState<GolfScreen>(roomContext || dailyContext ? 'playing' : 'intro');
+  useEffect(() => { if (roomContext || dailyContext) setTrack('golf'); }, []);
+  // Daily mode: same 5 courses for all players today via deterministic RNG
+  const [selected,     setSelected]     = useState(() =>
+    pickRandom(golfCourses, 5,
+      roomContext ? makeGameRng(roomContext, 'golf') :
+      dailyContext ? makeDailyRng('golf') :
+      undefined,
+    ),
+  );
   const [currentRound, setCurrentRound] = useState(0);   // 0–4
   const [roundResults, setRoundResults] = useState<GolfRoundResult[]>([]);
   const [lastShots,    setLastShots]    = useState(0);   // shots for the just-completed round
@@ -63,7 +71,12 @@ export default function GolfGame({ playerName, onExit, roomContext }: Props) {
 
   function handleNextRound() {
     if (currentRound + 1 >= 5) {
-      setScreen('results');
+      if (dailyContext) {
+        const total = roundResults.reduce((s, r) => s + r.shots, 0);
+        dailyContext.onComplete(total, `${total} shots`, true);
+      } else {
+        setScreen('results');
+      }
     } else {
       setCurrentRound(prev => prev + 1);
       setScreen('playing');

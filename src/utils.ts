@@ -39,6 +39,20 @@ export function makeGameRng(
   return mulberry32(hashStr(key));
 }
 
+/**
+ * Returns a deterministic RNG for Daily Challenge mode.
+ * All players who play the same mode on the same UTC day get identical content —
+ * same golf holes, same grandma patterns, same color targets, same time durations.
+ *
+ * @param mode    - game mode string (e.g. 'golf', 'time')
+ * @param dateStr - override date (YYYY-MM-DD); defaults to today's UTC date
+ */
+export function makeDailyRng(mode: string, dateStr?: string): () => number {
+  const today = dateStr ?? new Date().toISOString().split('T')[0];
+  const key   = `daily:${today}:${mode}`;
+  return mulberry32(hashStr(key));
+}
+
 // ── Time mode ────────────────────────────────────────────────────────────────
 
 /**

@@ -7,12 +7,13 @@ import SequenceTapResultScreen     from './SequenceTapResultScreen';
 type Screen = 'playing' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: import('../types').RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  import('../types').RoomContext;
+  dailyContext?: import('../types').DailyContext;
 }
 
-export default function SequenceTapGame({ playerName, onExit, roomContext }: Props) {
+export default function SequenceTapGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   useBackgroundMusic(); // keep subscription alive; no music for Sequence Tap
   useEffect(() => {
     // Sequence Tap uses only tap sounds — silence background music for this game
@@ -33,7 +34,11 @@ export default function SequenceTapGame({ playerName, onExit, roomContext }: Pro
     setMaxSeqLen(maxSeq);
     setFinalScore(score);
     setElapsedTime(elapsed);
-    setScreen('results');
+    if (dailyContext) {
+      dailyContext.onComplete(score, `${score} pts`, false);
+    } else {
+      setScreen('results');
+    }
   }
 
   function handlePlayAgain() {

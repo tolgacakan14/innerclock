@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { ArrowEscapeRoundResult, RoomContext } from '../types';
+import type { ArrowEscapeRoundResult, RoomContext, DailyContext } from '../types';
 import { arrowEscapeBoards }          from '../data/arrowEscapeBoards';
-import { makeGameRng }                from '../utils';
+import { makeGameRng, makeDailyRng }  from '../utils';
 import { useBackgroundMusic }         from '../hooks/useBackgroundMusic';
 import ArrowEscapeIntroScreen         from './ArrowEscapeIntroScreen';
 import ArrowEscapeGameScreen          from './ArrowEscapeGameScreen';
@@ -11,9 +11,10 @@ import ArrowEscapeResultsScreen       from './ArrowEscapeResultsScreen';
 type AEScreen = 'intro' | 'playing' | 'roundResult' | 'results';
 
 interface Props {
-  playerName:   string;
-  onExit:       () => void;
-  roomContext?: RoomContext;
+  playerName:    string;
+  onExit:        () => void;
+  roomContext?:  RoomContext;
+  dailyContext?: DailyContext;
 }
 
 /**
@@ -46,12 +47,19 @@ function pickBoards(rng: () => number = Math.random) {
   return picked;
 }
 
-export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Props) {
+export default function ArrowEscapeGame({ playerName, onExit, roomContext, dailyContext }: Props) {
   const { setTrack } = useBackgroundMusic();
   useEffect(() => { setTrack('main'); return () => { setTrack('main'); }; }, []);
-  // In room mode: skip intro → go straight to playing
-  const [screen,       setScreen]       = useState<AEScreen>(roomContext ? 'playing' : 'intro');
-  const [selected,     setSelected]     = useState(() => pickBoards(makeGameRng(roomContext, 'arrowEscape')));
+  // Room/daily mode: skip intro → go straight to playing
+  const [screen,       setScreen]       = useState<AEScreen>(roomContext || dailyContext ? 'playing' : 'intro');
+  // Daily mode: same boards for all players today
+  const [selected,     setSelected]     = useState(() =>
+    pickBoards(
+      roomContext ? makeGameRng(roomContext, 'arrowEscape') :
+      dailyContext ? makeDailyRng('arrowEscape') :
+      undefined,
+    ),
+  );
   const [currentRound, setCurrentRound] = useState(0);
   const [roundResults, setRoundResults] = useState<ArrowEscapeRoundResult[]>([]);
   const [lastResult,   setLastResult]   = useState<{ solveTime: number; mistakes: number }>({ solveTime: 0, mistakes: 0 });
@@ -80,7 +88,14 @@ export default function ArrowEscapeGame({ playerName, onExit, roomContext }: Pro
 
   function handleNextRound() {
     if (currentRound + 1 >= 3) {
-      setScreen('results');
+      if (dailyContext) {
+        const rawTime       = roundResults.reduce((s, r) => s + r.solveTime, 0);
+        const totalMistakes = roundResults.reduce((s, r) => s + r.mistakes, 0);
+        const finalTime     = +(rawTime + totalMistakes * 5).toFixed(1);
+        dailyContext.onComplete(finalTime, `${finalTime}s`, true);
+      } else {
+        setScreen('results');
+      }
     } else {
       setCurrentRound(prev => prev + 1);
       setScreen('playing');

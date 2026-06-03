@@ -1,5 +1,23 @@
 export type ShapeName = 'circle' | 'square' | 'triangle' | 'diamond' | 'ring' | 'blob';
 
+// ── Daily Challenge ───────────────────────────────────────────────────────────
+
+/**
+ * Passed to each game wrapper when it is running inside the Daily Challenge.
+ * The wrapper uses this to skip intro screens and report its final score back
+ * to the orchestrator instead of showing a standalone results screen.
+ */
+export interface DailyContext {
+  /** 0-based index of the current game within the 5-game run. */
+  gameIndex:  number;
+  /** Total games in the challenge (always 5). */
+  totalGames: number;
+  /** Called when the game produces a final score. */
+  onComplete: (rawScore: number, label: string, lowerIsBetter: boolean) => void;
+  /** Called if the player quits mid-challenge (taps ← Home during a game). */
+  onAbort:    () => void;
+}
+
 // ── Room / multiplayer ────────────────────────────────────────────────────────
 export interface RoomContext {
   roomId:     string;
