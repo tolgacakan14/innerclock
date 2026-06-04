@@ -48,15 +48,20 @@ const HOLE_R     = 18;
 const FRICTION   = 0.982;
 const BOUNCE     = 0.86;   // slightly more elastic than before
 const MAX_SPEED  = 18;
-const MAX_DRAG   = 140;
 // ── Aiming constants ─────────────────────────────────────────────────────────
-// MIN_DRAG: SVG-unit deadzone.  At contentScale ≈ 0.65, 22 SVG px ≈ 14 screen px —
-// above touch-jitter threshold (5–10 px) so stray taps never fire a shot.
-const MIN_DRAG     = 22;
+// Screen-pixel values drive the deadzone and power calculation in doAimFire().
+// SVG-unit MIN_DRAG / MAX_DRAG are kept only for the AimIndicator visual;
+// they are calibrated to match the screen-px values at contentScale ≈ 0.65.
+//   20 screen px × (1/0.65) ≈ 30 SVG units
+//  180 screen px × (1/0.65) ≈ 277 SVG units → rounded to 280
+const DEADZONE_SCREEN_PX = 20;   // screen px — stray-tap guard on release
+const MAX_DRAG_SCREEN_PX = 180;  // screen px — full-power drag distance
+const MIN_DRAG  = 30;            // SVG units — visual deadzone ring threshold
+const MAX_DRAG  = 280;           // SVG units — visual max-power reference
 // BALL_TAP_PX: screen-space tolerance for "tap on ball".
 // 100 px ≈ ball-centre hit zone of ~2.7 cm radius — wide enough for any
 // thumb on any phone.  We do not need pixel-perfect tapping on the ball.
-const BALL_TAP_PX  = 100;
+const BALL_TAP_PX = 100;
 // ── Course inner boundaries (green surface rect: x=30,y=44,w=540,h=830) ──────
 const COURSE_L = 30 + BALL_R + 1;   // left wall inner edge
 const COURSE_R = 570 - BALL_R - 1;  // right wall inner edge
@@ -232,19 +237,10 @@ const AUDIO_STORAGE_KEY = 'innerclock_music_on';
 export default function GolfGameScreen({ course, courseIndex, onComplete, onHome }: Props) {
   const svgRef  = useRef<SVGSVGElement>(null);
 
-  // Coordinate snapshot captured at pointer-down, BEFORE the CSS zoom animation
-  // fires.  getBoundingClientRect() always returns correct screen-space values
-  // even with CSS transforms on ancestor elements (unlike getScreenCTM() which
-  // has known cross-browser gaps when HTML ancestors carry CSS transforms).
-  // Storing the pre-zoom snapshot means every screenToCoursePoint() call during
-  // the gesture uses the same mapping regardless of zoom animation progress.
-  const snapRef = useRef<{
-    left:         number;
-    top:          number;
-    contentScale: number;   // min(elemW/VW, elemH/VH) — uniform SVG scale factor
-    offsetX:      number;   // horizontal letterbox padding (preserveAspectRatio)
-    offsetY:      number;   // vertical letterbox padding
-  } | null>(null);
+  // No coordinate snapshot — screenToCoursePoint() calls getBoundingClientRect()
+  // live on every event, which correctly includes the aim-zoom CSS transform.
+  // The zoom transform-origin is pinned to the ball's screen position, so the
+  // ball stays at the same pixel during zoom and coordinates stay stable.
 
   const ballRef       = useRef({ x: course.ballStart.x, y: course.ballStart.y, vx: 0, vy: 0 });
   const phaseRef      = useRef<Phase>('idle');
@@ -417,31 +413,27 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   /**
    * Convert a viewport pointer position → SVG / course coordinates.
    *
-   * Uses the snapshot captured at pointer-down (snapRef).
+   * Calls getBoundingClientRect() live on every event — this always includes
+   * the current CSS zoom transform, so coordinates are correct whether the
+   * field is at normal scale or mid-animation.
    *
-   * The SVG uses preserveAspectRatio="xMidYMid meet" with a 2:3 viewBox.
-   * On every phone the container is taller than the viewBox ratio, so the
-   * rendered content is letterboxed: full width, with vertical padding of
-   * (elemH − VH×contentScale)/2 at top and bottom.
-   *
-   * Formula:
-   *   svgX = (clientX − left − offsetX) / contentScale
-   *   svgY = (clientY − top  − offsetY) / contentScale
-   *
-   * Using getBoundingClientRect() (stored pre-zoom) is universally reliable —
-   * it returns correct screen-space values even with CSS transforms on HTML
-   * ancestor elements, which getScreenCTM() does NOT always handle correctly
-   * in Chrome/Safari on mobile.
+   * Key property: because the aim zoom transform-origin is pinned to the ball's
+   * screen position, the ball always maps to the same SVG coordinate regardless
+   * of zoom level, making the drag vector stable throughout the gesture.
    */
   function screenToCoursePoint(
     clientX: number,
     clientY: number,
   ): { x: number; y: number } | null {
-    const snap = snapRef.current;
-    if (!snap) return null;
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect         = svg.getBoundingClientRect();
+    const contentScale = Math.min(rect.width / VW, rect.height / VH);
+    const offsetX      = (rect.width  - VW * contentScale) / 2;
+    const offsetY      = (rect.height - VH * contentScale) / 2;
     return {
-      x: (clientX - snap.left - snap.offsetX) / snap.contentScale,
-      y: (clientY - snap.top  - snap.offsetY) / snap.contentScale,
+      x: (clientX - rect.left - offsetX) / contentScale,
+      y: (clientY - rect.top  - offsetY) / contentScale,
     };
   }
 
@@ -454,7 +446,6 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
   /** Tear down every piece of aim state; smoothly spring zoom back to 1. */
   function clearAimState() {
-    snapRef.current         = null;
     aimAnchorRef.current    = null;
     aimCurrentRef.current   = null;
     aimPointerIdRef.current = null;
@@ -474,12 +465,12 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     const svg = svgRef.current;
     if (!svg) return false;
 
-    // Snapshot the pre-zoom SVG rect — stable mapping for the whole gesture
+    // Current (pre-zoom) SVG layout — used for ball proximity check and for
+    // computing the zoom transform-origin.
     const rect         = svg.getBoundingClientRect();
     const contentScale = Math.min(rect.width / VW, rect.height / VH);
     const offsetX      = (rect.width  - VW * contentScale) / 2;
     const offsetY      = (rect.height - VH * contentScale) / 2;
-    snapRef.current    = { left: rect.left, top: rect.top, contentScale, offsetX, offsetY };
 
     // Ball proximity check (screen space)
     const b           = ballRef.current;
@@ -495,22 +486,40 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
         proximity, accepted: proximity <= BALL_TAP_PX,
         snapCS: contentScale, snapOX: offsetX, snapOY: offsetY,
         rectW: rect.width, rectH: rect.height,
-        aimScaleAtDown: aimScale,
+        aimScaleAtDown: 1,
       }));
     }
 
-    if (proximity > BALL_TAP_PX) {
-      snapRef.current = null;
-      return false;
-    }
+    if (proximity > BALL_TAP_PX) return false;
 
     // ── Enter aim mode ───────────────────────────────────────────────────────
     phaseRef.current = 'aiming';
     setPhase('aiming');
 
-    const params = computeAimParams(b.x, b.y);
-    setAimScale(params.scale);
-    setAimOrigin({ x: params.originX, y: params.originY });
+    // ── Aim zoom — gives the player more finger space, especially near edges ─
+    //
+    // Edge detection: ball within 20% of course width/height from any wall.
+    const cW  = COURSE_R - COURSE_L;
+    const cH  = COURSE_B - COURSE_T;
+    const em  = 0.20;
+    const nL  = b.x < COURSE_L + cW * em;
+    const nR  = b.x > COURSE_R - cW * em;
+    const nT  = b.y < COURSE_T + cH * em;
+    const nB  = b.y > COURSE_B - cH * em;
+    const nearCorner = (nL || nR) && (nT || nB);
+    const nearEdge   = nL || nR || nT || nB;
+    const aimZoomScale = nearCorner ? 0.65 : nearEdge ? 0.72 : 0.80;
+
+    // Transform-origin = ball's position in the field div, expressed as %.
+    // Scaling from this point keeps the ball pixel-stationary during zoom, so
+    // a stationary finger on the ball correctly maps to drag = 0.
+    const ballInFieldX = offsetX + b.x * contentScale;   // px from field-div left
+    const ballInFieldY = offsetY + b.y * contentScale;   // px from field-div top
+    const originX = Math.max(10, Math.min(90, (ballInFieldX / rect.width)  * 100));
+    const originY = Math.max(10, Math.min(90, (ballInFieldY / rect.height) * 100));
+
+    setAimScale(aimZoomScale);
+    setAimOrigin({ x: originX, y: originY });
 
     // Ball-relative drag model:
     //   anchor  = ball world position (FIXED for the whole gesture)
@@ -564,7 +573,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     }
   }
 
-  /** Release: fire shot if drag ≥ MIN_DRAG, otherwise cancel. */
+  /** Release: fire shot if drag ≥ DEADZONE_SCREEN_PX, otherwise cancel. */
   function doAimFire(clientX: number, clientY: number) {
     if (phaseRef.current !== 'aiming') return;
 
@@ -573,26 +582,41 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     const current = screenToCoursePoint(clientX, clientY) ?? aimCurrentRef.current;
     const b       = ballRef.current;
 
+    // Get live contentScale BEFORE clearAimState() queues the aimScale reset.
+    // React batches state updates, so the DOM is still zoomed right now and
+    // getBoundingClientRect() returns the current (zoomed) rect — which is
+    // exactly what we need for a consistent svgDist → screenDist conversion.
+    const svgEl  = svgRef.current;
+    const livecs = svgEl ? (() => {
+      const r = svgEl.getBoundingClientRect();
+      return Math.min(r.width / VW, r.height / VH);
+    })() : 0.65;
+
     clearAimState();   // reset visuals & zoom BEFORE early-returns
 
     if (!anchor || !current) return;
 
-    const dx   = current.x - anchor.x;   // dragVector.x (ball-relative)
-    const dy   = current.y - anchor.y;   // dragVector.y
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const dx      = current.x - anchor.x;   // dragVector.x (ball-relative, SVG units)
+    const dy      = current.y - anchor.y;   // dragVector.y
+    const svgDist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < MIN_DRAG) {
+    // Convert drag distance to screen pixels for deadzone + power calculation.
+    // Using the current (zoomed) contentScale gives the true screen distance.
+    const cs          = livecs;
+    const screenDist  = svgDist * cs;
+
+    if (screenDist < DEADZONE_SCREEN_PX) {
       if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'cancelled-deadzone' }));
       return;    // tap without meaningful drag — do not shoot
     }
 
     if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'fired' }));
 
-    const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
+    const power = Math.min(screenDist, MAX_DRAG_SCREEN_PX) / MAX_DRAG_SCREEN_PX;
     const speed = power * MAX_SPEED;
     prevBallPosRef.current = { x: b.x, y: b.y };
     // Shot direction = OPPOSITE of drag direction  (classic pull-back model)
-    ballRef.current = { ...b, vx: (-dx / dist) * speed, vy: (-dy / dist) * speed };
+    ballRef.current = { ...b, vx: (-dx / svgDist) * speed, vy: (-dy / svgDist) * speed };
     playGolfSwing(power);
 
     const newShots = shotsRef.current + 1;
@@ -720,13 +744,13 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
         className="golf-game-field"
         style={{
           transform:       `scale(${aimScale})`,
-          // Dynamic origin: shifts away from the edge the ball is near,
-          // opening up more drag room in that direction.
+          // Origin = ball's position in field div — keeps ball pixel-stationary
+          // while zooming so coordinate math stays correct throughout the gesture.
           transformOrigin: `${aimOrigin.x}% ${aimOrigin.y}%`,
-          // Snappy zoom-in on drag start; smooth spring-back on release.
+          // Snappy zoom-out on aim start; smooth spring-back on cancel/release.
           transition: aimScale < 1
-            ? 'transform 0.16s cubic-bezier(0.25, 0, 0, 1)'
-            : 'transform 0.40s cubic-bezier(0.25, 0, 0, 1)',
+            ? 'transform 0.18s cubic-bezier(0.25, 0, 0, 1)'
+            : 'transform 0.42s cubic-bezier(0.25, 0, 0, 1)',
         }}
       >
         <svg
