@@ -197,9 +197,15 @@ function AimOverlay({
 
   const nx  = -dx / dist;
   const ny  = -dy / dist;
-  // Arrow length in screen pixels: grows 18→60 while below deadzone,
-  // then 28→168 above deadzone based on power.
-  const len   = below ? 18 + (dist / DEAD) * 42 : 28 + power * 140;
+  // Visual arrow length in screen pixels.
+  // The VISUAL_ARROW_SCALE (0.55) caps the on-screen arrow at ~55 % of the
+  // original length so it no longer stretches across the whole map.
+  // Shot power in doAimFire() uses raw screen drag distance, not this value,
+  // so reducing len here has zero effect on ball speed or physics.
+  const VISUAL_ARROW_SCALE = 0.55;
+  const len   = below
+    ? 18 + (dist / DEAD) * 24        // below deadzone: 18 → 42 px (was 18→60)
+    : (28 + power * 140) * VISUAL_ARROW_SCALE;  // active: ~15 → 93 px (was 28→168)
   const alpha = below ? 0.38 : 0.74;
   const dotR  = below ? 3 : 5;
   const tipX  = ballX + nx * len;
