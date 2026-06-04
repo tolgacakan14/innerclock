@@ -3,6 +3,43 @@ import type { GolfCourse, GolfWall } from '../types';
 
 const RAD_TO_DEG = 180 / Math.PI;
 
+// ── Debug mode ────────────────────────────────────────────────────────────────
+// Add ?debugGolfAim to the URL to enable the aim debug overlay.
+// e.g.  http://localhost:5173/?debugGolfAim
+// Remove or set to false before shipping.
+const GOLF_AIM_DEBUG = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).has('debugGolfAim');
+
+interface DbgState {
+  phase: string;
+  bWX: number; bWY: number;      // ball world (SVG) position
+  bSX: number; bSY: number;      // ball screen position (calculated from snapshot)
+  pSX: number; pSY: number;      // raw pointer screen clientX/Y
+  pWX: number; pWY: number;      // pointer world (after screenToCoursePoint)
+  aWX: number; aWY: number;      // aim anchor world position
+  proximity: number;              // screen-px distance: touch → ball
+  accepted: boolean;              // proximity ≤ BALL_TAP_PX
+  dragX: number; dragY: number;  // drag vector SVG units
+  shotX: number; shotY: number;  // shot vector SVG units
+  dragDist: number;
+  power: number;
+  snapCS:  number;                // contentScale at pointer-down
+  snapOX: number; snapOY: number;// letterbox offsets at pointer-down
+  rectW: number;  rectH: number; // raw SVG element rect size at pointer-down
+  ptId: number | null;
+  aimScaleAtDown: number;        // CSS zoom value when pointer-down fired
+}
+const DBG0: DbgState = {
+  phase: 'idle', bWX: 0, bWY: 0, bSX: 0, bSY: 0,
+  pSX: 0, pSY: 0, pWX: 0, pWY: 0, aWX: 0, aWY: 0,
+  proximity: 999, accepted: false,
+  dragX: 0, dragY: 0, shotX: 0, shotY: 0,
+  dragDist: 0, power: 0,
+  snapCS: 0, snapOX: 0, snapOY: 0,
+  rectW: 0, rectH: 0,
+  ptId: null, aimScaleAtDown: 1,
+};
+
 // ── Physics constants ─────────────────────────────────────────────────────────
 const VW         = 600;
 const VH         = 900;
@@ -19,7 +56,8 @@ const MIN_DRAG     = 22;
 // BALL_TAP_PX: screen-space tolerance for "tap on ball".  Only finger-downs
 // within this radius of the ball's screen position enter aim mode; anywhere
 // else is ignored (no accidental aim from touching empty course space).
-const BALL_TAP_PX  = 44;
+// 60 px ≈ 1.6 cm on most phones — generous enough for chunky thumbs.
+const BALL_TAP_PX  = 60;
 // ── Course inner boundaries (green surface rect: x=30,y=44,w=540,h=830) ──────
 const COURSE_L = 30 + BALL_R + 1;   // left wall inner edge
 const COURSE_R = 570 - BALL_R - 1;  // right wall inner edge
@@ -263,6 +301,11 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   const [aimAnchor,   setAimAnchor]  = useState<{ x: number; y: number } | null>(null);
   const [aimDisplay,  setAimDisplay] = useState<{ x: number; y: number } | null>(null);
 
+  // ── Debug state ───────────────────────────────────────────────────────────
+  // Always declared (hooks can't be conditional); only populated when
+  // GOLF_AIM_DEBUG is true so there's zero overhead in production.
+  const [dbg, setDbg] = useState<DbgState>(DBG0);
+
   // ── Physics loop ──────────────────────────────────────────────────────────
   useEffect(() => {
     let animId: number;
@@ -421,7 +464,23 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     const b           = ballRef.current;
     const ballScreenX = rect.left + offsetX + b.x * contentScale;
     const ballScreenY = rect.top  + offsetY + b.y * contentScale;
-    if (Math.hypot(e.clientX - ballScreenX, e.clientY - ballScreenY) > BALL_TAP_PX) {
+    const proximity   = Math.hypot(e.clientX - ballScreenX, e.clientY - ballScreenY);
+
+    if (GOLF_AIM_DEBUG) {
+      setDbg(d => ({ ...d,
+        phase: 'pointerdown',
+        bWX: b.x, bWY: b.y,
+        bSX: ballScreenX, bSY: ballScreenY,
+        pSX: e.clientX,   pSY: e.clientY,
+        proximity, accepted: proximity <= BALL_TAP_PX,
+        snapCS: contentScale, snapOX: offsetX, snapOY: offsetY,
+        rectW: rect.width, rectH: rect.height,
+        ptId: e.pointerId,
+        aimScaleAtDown: aimScale,
+      }));
+    }
+
+    if (proximity > BALL_TAP_PX) {
       snapRef.current = null;   // not a valid aim start — discard snapshot
       return;
     }
@@ -451,6 +510,16 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     setAimAnchor({ x: pt.x, y: pt.y });
     setAimDisplay({ x: pt.x, y: pt.y });
 
+    if (GOLF_AIM_DEBUG) {
+      setDbg(d => ({ ...d,
+        phase: 'aiming',
+        pWX: pt.x, pWY: pt.y,
+        aWX: pt.x, aWY: pt.y,
+        dragX: 0, dragY: 0, shotX: 0, shotY: 0,
+        dragDist: 0, power: 0,
+      }));
+    }
+
     // Pointer capture: drag events keep firing even when the finger slides off
     // the SVG element (onto the header or screen bezel).
     (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
@@ -464,6 +533,23 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     if (!pt) return;
     aimCurrentRef.current = pt;
     setAimDisplay(pt);
+
+    if (GOLF_AIM_DEBUG) {
+      const anchor = aimAnchorRef.current;
+      if (anchor) {
+        const dragX   = pt.x - anchor.x;
+        const dragY   = pt.y - anchor.y;
+        const dragDist = Math.hypot(dragX, dragY);
+        const power   = Math.min(dragDist, MAX_DRAG) / MAX_DRAG;
+        setDbg(d => ({ ...d,
+          pSX: e.clientX, pSY: e.clientY,
+          pWX: pt.x,      pWY: pt.y,
+          dragX, dragY,
+          shotX: -dragX, shotY: -dragY,
+          dragDist, power,
+        }));
+      }
+    }
   }
 
   function handlePointerUp(e: React.PointerEvent<SVGSVGElement>) {
@@ -494,7 +580,12 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
     // Deadzone: MIN_DRAG SVG units (≈ 14 screen px at 0.65 contentScale).
     // Distances below this are treated as stray taps, not intentional shots.
-    if (dist < MIN_DRAG) { phaseRef.current = 'idle'; setPhase('idle'); return; }
+    if (dist < MIN_DRAG) {
+      if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'cancelled-deadzone' }));
+      phaseRef.current = 'idle'; setPhase('idle'); return;
+    }
+
+    if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'fired' }));
 
     // ── Fire shot ────────────────────────────────────────────────────────────
     const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
@@ -744,6 +835,47 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
             <circle cx={ballPos.x} cy={ballPos.y} r={BALL_R}
               fill="rgba(255,255,255,0.90)" className="golf-ball-sinking" />
           )}
+
+          {/* ── Aim debug markers (only when ?debugGolfAim is in URL) ─────── */}
+          {GOLF_AIM_DEBUG && (() => {
+            const cs = dbg.snapCS || 1;
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                {/* Yellow dashed circle = BALL_TAP_PX proximity zone */}
+                <circle cx={ballPos.x} cy={ballPos.y} r={BALL_TAP_PX / cs}
+                  fill="none" stroke="rgba(255,220,0,0.5)" strokeWidth="1.5"
+                  strokeDasharray="8 5" />
+                {/* Red dot = ball centre (should be exactly under the white ball) */}
+                <circle cx={ballPos.x} cy={ballPos.y} r={5}
+                  fill="rgba(255,40,40,0.9)" />
+                {/* MIN_DRAG deadzone circle around anchor */}
+                {phase === 'aiming' && (
+                  <circle cx={dbg.aWX} cy={dbg.aWY} r={MIN_DRAG}
+                    fill="none" stroke="rgba(255,100,255,0.55)" strokeWidth="1.5"
+                    strokeDasharray="4 4" />
+                )}
+                {/* Cyan dot = pointer world position */}
+                {phase === 'aiming' && (
+                  <circle cx={dbg.pWX} cy={dbg.pWY} r={7}
+                    fill="rgba(0,255,220,0.85)" />
+                )}
+                {/* Orange dashed line = drag vector (anchor → current pointer) */}
+                {phase === 'aiming' && dbg.dragDist > 0 && (
+                  <line x1={dbg.aWX} y1={dbg.aWY} x2={dbg.pWX} y2={dbg.pWY}
+                    stroke="rgba(255,160,0,0.8)" strokeWidth="2.5"
+                    strokeDasharray="7 5" strokeLinecap="round" />
+                )}
+                {/* Blue solid line = shot vector (from ball, opposite of drag) */}
+                {phase === 'aiming' && dbg.dragDist >= MIN_DRAG && (
+                  <line x1={ballPos.x} y1={ballPos.y}
+                        x2={ballPos.x + (dbg.shotX / dbg.dragDist) * Math.min(dbg.dragDist, MAX_DRAG) * 1.0}
+                        y2={ballPos.y + (dbg.shotY / dbg.dragDist) * Math.min(dbg.dragDist, MAX_DRAG) * 1.0}
+                    stroke="rgba(80,160,255,0.9)" strokeWidth="3"
+                    strokeLinecap="round" />
+                )}
+              </g>
+            );
+          })()}
         </svg>
 
         {/* Aim hint */}
@@ -754,6 +886,35 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
       {/* KRONE hole-in-one overlay */}
       <KroneOverlay active={showKrone} />
+
+      {/* ── Golf aim debug panel — visible only when ?debugGolfAim in URL ── */}
+      {GOLF_AIM_DEBUG && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0,
+          background: 'rgba(0,0,0,0.84)',
+          color: '#0ff',
+          fontSize: '10px',
+          fontFamily: 'monospace',
+          padding: '6px 10px 8px',
+          zIndex: 9999,
+          lineHeight: 1.65,
+          pointerEvents: 'none',
+          whiteSpace: 'pre',
+        }}>
+          {[
+            `── GOLF AIM DEBUG ──────────────────────────────────`,
+            `phase: ${dbg.phase}   isAiming: ${phase === 'aiming'}   ptId: ${dbg.ptId ?? '–'}`,
+            `ballW  (${dbg.bWX.toFixed(0)}, ${dbg.bWY.toFixed(0)})    ballS  (${dbg.bSX.toFixed(0)}, ${dbg.bSY.toFixed(0)})`,
+            `ptrS   (${dbg.pSX.toFixed(0)}, ${dbg.pSY.toFixed(0)})    ptrW   (${dbg.pWX.toFixed(1)}, ${dbg.pWY.toFixed(1)})`,
+            `proximity ${dbg.proximity.toFixed(1)} px  tapPx ${BALL_TAP_PX}  accepted: ${dbg.accepted}`,
+            `snap   CS ${dbg.snapCS.toFixed(3)}   oX ${dbg.snapOX.toFixed(1)}   oY ${dbg.snapOY.toFixed(1)}`,
+            `svgRect  ${dbg.rectW.toFixed(0)} × ${dbg.rectH.toFixed(0)}  aimScaleAtDown ${dbg.aimScaleAtDown.toFixed(2)}`,
+            `anchor (${dbg.aWX.toFixed(1)}, ${dbg.aWY.toFixed(1)})`,
+            `drag   (${dbg.dragX.toFixed(1)}, ${dbg.dragY.toFixed(1)})   dist ${dbg.dragDist.toFixed(1)}   minDrag ${MIN_DRAG}`,
+            `shot   (${dbg.shotX.toFixed(1)}, ${dbg.shotY.toFixed(1)})   power ${(dbg.power * 100).toFixed(0)}%   maxDrag ${MAX_DRAG}`,
+          ].join('\n')}
+        </div>
+      )}
     </div>
   );
 }
