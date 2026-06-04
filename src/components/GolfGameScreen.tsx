@@ -12,6 +12,14 @@ const FRICTION   = 0.982;
 const BOUNCE     = 0.86;   // slightly more elastic than before
 const MAX_SPEED  = 18;
 const MAX_DRAG   = 140;
+// ── Aiming constants ─────────────────────────────────────────────────────────
+// MIN_DRAG: SVG-unit deadzone.  At contentScale ≈ 0.65, 22 SVG px ≈ 14 screen px —
+// above touch-jitter threshold (5–10 px) so stray taps never fire a shot.
+const MIN_DRAG     = 22;
+// BALL_TAP_PX: screen-space tolerance for "tap on ball".  Only finger-downs
+// within this radius of the ball's screen position enter aim mode; anywhere
+// else is ignored (no accidental aim from touching empty course space).
+const BALL_TAP_PX  = 44;
 // ── Course inner boundaries (green surface rect: x=30,y=44,w=540,h=830) ──────
 const COURSE_L = 30 + BALL_R + 1;   // left wall inner edge
 const COURSE_R = 570 - BALL_R - 1;  // right wall inner edge
@@ -90,7 +98,7 @@ function computeAimParams(bx: number, by: number): AimParams {
   const nearEdge   = edgeCount >= 1;
 
   // Corner: extra zoom-out so the player still has a usable drag region
-  const scale = nearCorner ? 0.52 : nearEdge ? 0.68 : 0.78;
+  const scale = nearCorner ? 0.56 : nearEdge ? 0.62 : 0.75;
 
   // Express ball position as 0–100 % of the SVG viewBox dimensions
   const ballXPct = (bx / VW) * 100;
@@ -126,7 +134,7 @@ function AimIndicator({
 }) {
   const dx = currentX - anchorX, dy = currentY - anchorY;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 10) return null;                    // 10 SVG-unit deadzone
+  if (dist < MIN_DRAG) return null;              // MIN_DRAG SVG-unit deadzone
   const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
   const nx = -dx / dist, ny = -dy / dist;        // opposite of drag direction
   const len = power * 170;
@@ -163,8 +171,21 @@ interface Props {
 const AUDIO_STORAGE_KEY = 'innerclock_music_on';
 
 export default function GolfGameScreen({ course, courseIndex, onComplete, onHome }: Props) {
-  const svgRef    = useRef<SVGSVGElement>(null);
-  const svgRectRef = useRef<DOMRect | null>(null);
+  const svgRef  = useRef<SVGSVGElement>(null);
+
+  // Coordinate snapshot captured at pointer-down, BEFORE the CSS zoom animation
+  // fires.  getBoundingClientRect() always returns correct screen-space values
+  // even with CSS transforms on ancestor elements (unlike getScreenCTM() which
+  // has known cross-browser gaps when HTML ancestors carry CSS transforms).
+  // Storing the pre-zoom snapshot means every screenToCoursePoint() call during
+  // the gesture uses the same mapping regardless of zoom animation progress.
+  const snapRef = useRef<{
+    left:         number;
+    top:          number;
+    contentScale: number;   // min(elemW/VW, elemH/VH) — uniform SVG scale factor
+    offsetX:      number;   // horizontal letterbox padding (preserveAspectRatio)
+    offsetY:      number;   // vertical letterbox padding
+  } | null>(null);
 
   const ballRef       = useRef({ x: course.ballStart.x, y: course.ballStart.y, vx: 0, vy: 0 });
   const phaseRef      = useRef<Phase>('idle');
@@ -322,94 +343,160 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  // ── SVG coords ────────────────────────────────────────────────────────────
-  // Use a cached rect (snapshotted at pointer-down) so that the CSS scale
-  // transition on .golf-game-field doesn't jitter the coordinate transform
-  // mid-gesture.
-  function toSVGPoint(clientX: number, clientY: number) {
-    const svg = svgRef.current;
-    if (!svg) return null;
-    const r = svgRectRef.current ?? svg.getBoundingClientRect();
+  // ── Course coordinate mapping ─────────────────────────────────────────────
+  /**
+   * Convert a viewport pointer position → SVG / course coordinates.
+   *
+   * Uses the snapshot captured at pointer-down (snapRef).
+   *
+   * The SVG uses preserveAspectRatio="xMidYMid meet" with a 2:3 viewBox.
+   * On every phone the container is taller than the viewBox ratio, so the
+   * rendered content is letterboxed: full width, with vertical padding of
+   * (elemH − VH×contentScale)/2 at top and bottom.
+   *
+   * Formula:
+   *   svgX = (clientX − left − offsetX) / contentScale
+   *   svgY = (clientY − top  − offsetY) / contentScale
+   *
+   * Using getBoundingClientRect() (stored pre-zoom) is universally reliable —
+   * it returns correct screen-space values even with CSS transforms on HTML
+   * ancestor elements, which getScreenCTM() does NOT always handle correctly
+   * in Chrome/Safari on mobile.
+   */
+  function screenToCoursePoint(
+    clientX: number,
+    clientY: number,
+  ): { x: number; y: number } | null {
+    const snap = snapRef.current;
+    if (!snap) return null;
     return {
-      x: (clientX - r.left) * (VW / r.width),
-      y: (clientY - r.top)  * (VH / r.height),
+      x: (clientX - snap.left - snap.offsetX) / snap.contentScale,
+      y: (clientY - snap.top  - snap.offsetY) / snap.contentScale,
     };
   }
 
+  // ── Aim state machine helpers ─────────────────────────────────────────────
+  //
+  // State transitions:
+  //   idle → (pointerdown near ball) → aiming
+  //   aiming → (pointerup, dist ≥ MIN_DRAG) → rolling  (shot fired)
+  //   aiming → (pointerup, dist < MIN_DRAG) → idle     (cancelled — deadzone)
+  //   aiming → (pointercancel / leave)      → idle     (cancelled — interrupted)
+
+  /** Tear down every piece of aim state and smoothly spring zoom back to 1. */
+  function clearAimState() {
+    snapRef.current         = null;
+    aimAnchorRef.current    = null;
+    aimCurrentRef.current   = null;
+    aimPointerIdRef.current = null;
+    setAimAnchor(null);
+    setAimDisplay(null);
+    setAimScale(1);         // smooth spring-back via CSS transition
+    phaseRef.current = 'idle';
+    setPhase('idle');
+  }
+
   // ── Pointer handlers ──────────────────────────────────────────────────────
+
   function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
     if (phaseRef.current !== 'idle') return;
-    // Snapshot the SVG rect BEFORE the zoom animation starts — any later call
-    // to getBoundingClientRect() during the CSS transition returns a mid-animation
-    // value that drifts the coordinate mapping.
-    svgRectRef.current = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-    const pt = toSVGPoint(e.clientX, e.clientY);
-    if (!pt) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    // ── 1. Capture coordinate snapshot BEFORE the CSS zoom animation fires ────
+    // getBoundingClientRect() gives the element's screen-space rect, correctly
+    // accounting for CSS transforms on ancestor HTML elements.  The SVG content
+    // is letterboxed inside this rect due to preserveAspectRatio="xMidYMid meet".
+    const rect         = svg.getBoundingClientRect();
+    const contentScale = Math.min(rect.width / VW, rect.height / VH);
+    const offsetX      = (rect.width  - VW * contentScale) / 2;
+    const offsetY      = (rect.height - VH * contentScale) / 2;
+    snapRef.current    = { left: rect.left, top: rect.top, contentScale, offsetX, offsetY };
+
+    // ── 2. Ball proximity check ───────────────────────────────────────────────
+    // Convert the ball's SVG position to screen space using the snapshot, then
+    // measure the screen-pixel distance to the touch point.
+    // Taps further than BALL_TAP_PX from the ball are ignored — only touches
+    // on/near the ball enter aim mode.
+    const b           = ballRef.current;
+    const ballScreenX = rect.left + offsetX + b.x * contentScale;
+    const ballScreenY = rect.top  + offsetY + b.y * contentScale;
+    if (Math.hypot(e.clientX - ballScreenX, e.clientY - ballScreenY) > BALL_TAP_PX) {
+      snapRef.current = null;   // not a valid aim start — discard snapshot
+      return;
+    }
+
+    // ── 3. Convert touch position to SVG / course coordinates ────────────────
+    const pt = screenToCoursePoint(e.clientX, e.clientY);
+    if (!pt) return;   // shouldn't happen — snapshot is set just above
+
+    // ── 4. Enter aiming state ─────────────────────────────────────────────────
     phaseRef.current = 'aiming';
     setPhase('aiming');
 
-    // Compute edge-aware zoom scale and transform-origin based on ball position
-    const b = ballRef.current;
+    // Zoom out — edge-aware scale and origin shift.
+    // Called AFTER the snapshot is stored so the zoom animation doesn't
+    // invalidate our pre-zoom coordinate mapping.
     const params = computeAimParams(b.x, b.y);
     setAimScale(params.scale);
     setAimOrigin({ x: params.originX, y: params.originY });
 
-    // Anchor = where the player touched (NOT the ball centre).
-    // The shot direction will be derived from anchor→current, so a touch at the
-    // edge of the tap zone no longer creates an instant wrong-direction aim.
-    aimAnchorRef.current  = { x: pt.x, y: pt.y };
-    aimCurrentRef.current = { x: pt.x, y: pt.y };
+    // Anchor = where the finger first landed (NOT the ball centre).
+    // Shot direction = OPPOSITE of (anchor → current).
+    // Starting at zero drag means no instant aim direction even when the
+    // player taps near the edge of the tap zone.
+    aimAnchorRef.current    = { x: pt.x, y: pt.y };
+    aimCurrentRef.current   = { x: pt.x, y: pt.y };
     aimPointerIdRef.current = e.pointerId;
     setAimAnchor({ x: pt.x, y: pt.y });
     setAimDisplay({ x: pt.x, y: pt.y });
-    // Capture pointer so drag continues even when finger leaves the SVG element
+
+    // Pointer capture: drag events keep firing even when the finger slides off
+    // the SVG element (onto the header or screen bezel).
     (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     if (phaseRef.current !== 'aiming') return;
-    // Ignore stray events from a second finger that touched after the aim started
+    // Ignore events from any finger that wasn't the one that started aiming
     if (e.pointerId !== aimPointerIdRef.current) return;
-    const pt = toSVGPoint(e.clientX, e.clientY);
+    const pt = screenToCoursePoint(e.clientX, e.clientY);
     if (!pt) return;
     aimCurrentRef.current = pt;
     setAimDisplay(pt);
   }
 
   function handlePointerUp(e: React.PointerEvent<SVGSVGElement>) {
-    // Ignore events from pointers other than the one that initiated the aim.
-    // Without this guard a second finger's pointerup would prematurely reset the
-    // scale and corrupt the aim while the first finger is still dragging.
     if (aimPointerIdRef.current !== null && e.pointerId !== aimPointerIdRef.current) return;
-    aimPointerIdRef.current = null;
-
-    // Reset scale only — aimOrigin is intentionally kept unchanged.
-    // Changing the origin simultaneously with the scale-back animation would
-    // make the field appear to drift/slide, which feels broken.
-    setAimScale(1);
-    svgRectRef.current = null;
     if (phaseRef.current !== 'aiming') return;
 
     const anchor  = aimAnchorRef.current;
     const current = aimCurrentRef.current;
     const b       = ballRef.current;
 
-    // Clear refs & display states before any early-return
-    aimAnchorRef.current  = null;
-    aimCurrentRef.current = null;
+    // Clear aim visuals + reset zoom regardless of shot outcome
+    snapRef.current         = null;
+    aimAnchorRef.current    = null;
+    aimCurrentRef.current   = null;
+    aimPointerIdRef.current = null;
     setAimAnchor(null);
     setAimDisplay(null);
+    setAimScale(1);          // smooth spring-back via CSS transition
 
     if (!anchor || !current) { phaseRef.current = 'idle'; setPhase('idle'); return; }
 
-    // Displacement from anchor → current gives the drag vector.
-    // Shot fires in the OPPOSITE direction (same concept as pulling a slingshot).
-    const dx = current.x - anchor.x, dy = current.y - anchor.y;
+    // ── Drag vector: anchor → current (pull-back-and-release model) ──────────
+    // Shot direction = OPPOSITE of drag direction.
+    // dragVector points where the finger went; shotVector points back at the ball.
+    const dx   = current.x - anchor.x;
+    const dy   = current.y - anchor.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // 10 SVG-unit deadzone — matches the AimIndicator visibility threshold.
-    if (dist < 10) { phaseRef.current = 'idle'; setPhase('idle'); return; }
+    // Deadzone: MIN_DRAG SVG units (≈ 14 screen px at 0.65 contentScale).
+    // Distances below this are treated as stray taps, not intentional shots.
+    if (dist < MIN_DRAG) { phaseRef.current = 'idle'; setPhase('idle'); return; }
 
+    // ── Fire shot ────────────────────────────────────────────────────────────
     const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
     const speed = power * MAX_SPEED;
     prevBallPosRef.current = { x: b.x, y: b.y };
@@ -423,13 +510,26 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     setPhase('rolling');
   }
 
-  // Safety-net: fires when the pointer leaves the SVG element without the browser
-  // dispatching pointerup/pointercancel (e.g. pointer-capture silently lost on
-  // some mobile browsers).  With active capture this event is suppressed, so it
-  // only triggers in exactly the edge-case it is meant to protect against.
+  /**
+   * handlePointerCancel: finger was forcibly interrupted (incoming call,
+   * notification centre swipe, palm rejection, etc.).
+   * Must NOT fire a shot — just clean up and reset.
+   */
+  function handlePointerCancel(e: React.PointerEvent<SVGSVGElement>) {
+    if (aimPointerIdRef.current !== null && e.pointerId !== aimPointerIdRef.current) return;
+    if (phaseRef.current !== 'aiming') return;
+    clearAimState();
+  }
+
+  /**
+   * handlePointerLeave: safety-net for the rare case where pointer capture
+   * is silently dropped (some mobile browsers) and the finger leaves the SVG
+   * without triggering pointerup/pointercancel.  With active capture this
+   * event is suppressed on most browsers, so it only fires in that edge case.
+   */
   function handlePointerLeave(e: React.PointerEvent<SVGSVGElement>) {
     if (phaseRef.current === 'aiming' && e.pointerId === aimPointerIdRef.current) {
-      handlePointerUp(e);
+      clearAimState();
     }
   }
 
@@ -477,10 +577,18 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
           className="golf-game-svg"
           viewBox={`0 0 ${VW} ${VH}`}
           preserveAspectRatio="xMidYMid meet"
+          style={{
+            // Prevent the browser from scrolling the page or zooming while
+            // the player is dragging to aim.  Required for pointer events to
+            // work reliably on mobile (iOS Safari, Android Chrome).
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           onPointerLeave={handlePointerLeave}
         >
           <defs>
@@ -640,7 +748,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
         {/* Aim hint */}
         <div className="golf-aim-hint">
-          {phase === 'idle' && 'Drag ball to aim · release to shoot'}
+          {phase === 'idle' && 'Touch ball · drag to aim · release to shoot'}
         </div>
       </div>
 
