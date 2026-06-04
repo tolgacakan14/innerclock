@@ -11,33 +11,25 @@ const GOLF_AIM_DEBUG = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).has('debugGolfAim');
 
 interface DbgState {
-  phase: string;
-  bWX: number; bWY: number;      // ball world (SVG) position
-  bSX: number; bSY: number;      // ball screen position (calculated from snapshot)
-  pSX: number; pSY: number;      // raw pointer screen clientX/Y
-  pWX: number; pWY: number;      // pointer world (after screenToCoursePoint)
-  aWX: number; aWY: number;      // aim anchor world position
-  proximity: number;              // screen-px distance: touch → ball
-  accepted: boolean;              // proximity ≤ BALL_TAP_PX
-  dragX: number; dragY: number;  // drag vector SVG units
-  shotX: number; shotY: number;  // shot vector SVG units
-  dragDist: number;
-  power: number;
-  snapCS:  number;                // contentScale at pointer-down
-  snapOX: number; snapOY: number;// letterbox offsets at pointer-down
-  rectW: number;  rectH: number; // raw SVG element rect size at pointer-down
-  ptId: number | null;
-  aimScaleAtDown: number;        // CSS zoom value when pointer-down fired
+  phase:      string;
+  bSX: number; bSY: number;    // ball screen position
+  pSX: number; pSY: number;    // raw pointer screen position (clientX/Y)
+  proximity:  number;           // screen-px distance: touch → ball
+  accepted:   boolean;          // proximity ≤ BALL_TAP_PX
+  dragDist:   number;           // screen-px drag distance
+  power:      number;           // 0–1
+  snapCS:     number;           // contentScale at aim start
+  rectW:      number;
+  rectH:      number;
+  aimZoom:    number;           // current aimScale CSS value
+  arrowVis:   boolean;          // is aim overlay visible
 }
 const DBG0: DbgState = {
-  phase: 'idle', bWX: 0, bWY: 0, bSX: 0, bSY: 0,
-  pSX: 0, pSY: 0, pWX: 0, pWY: 0, aWX: 0, aWY: 0,
+  phase: 'idle', bSX: 0, bSY: 0, pSX: 0, pSY: 0,
   proximity: 999, accepted: false,
-  dragX: 0, dragY: 0, shotX: 0, shotY: 0,
   dragDist: 0, power: 0,
-  snapCS: 0, snapOX: 0, snapOY: 0,
-  rectW: 0, rectH: 0,
-  ptId: null, aimScaleAtDown: 1,
+  snapCS: 0, rectW: 0, rectH: 0,
+  aimZoom: 1, arrowVis: false,
 };
 
 // ── Physics constants ─────────────────────────────────────────────────────────
@@ -54,8 +46,8 @@ const MAX_SPEED  = 18;
 // they are calibrated to match the screen-px values at contentScale ≈ 0.65.
 //   20 screen px × (1/0.65) ≈ 30 SVG units
 //  180 screen px × (1/0.65) ≈ 277 SVG units → rounded to 280
-const DEADZONE_SCREEN_PX = 20;   // screen px — stray-tap guard on release
-const MAX_DRAG_SCREEN_PX = 180;  // screen px — full-power drag distance
+const DEADZONE_SCREEN_PX = 15;   // screen px — stray-tap guard on release
+const MAX_DRAG_SCREEN_PX = 220;  // screen px — full-power drag distance
 const MIN_DRAG  = 30;            // SVG units — visual deadzone ring threshold
 const MAX_DRAG  = 280;           // SVG units — visual max-power reference
 // BALL_TAP_PX: screen-space tolerance for "tap on ball".
@@ -157,59 +149,77 @@ function computeAimParams(bx: number, by: number): AimParams {
   return { scale, originX, originY };
 }
 
-// ── Aim indicator ─────────────────────────────────────────────────────────────
+// ── Aim overlay (screen-space, position:fixed) ────────────────────────────────
 //
-// dragX/dragY = pointerWorld − ballWorld  (ball-relative, in SVG units).
+// Rendered OUTSIDE the game SVG as a fixed-position element that sits above
+// everything.  This means CSS zoom on the map div has zero effect on the arrow —
+// no coordinate drift, no disappearing arrow, no power miscalculation.
 //
-// IMPORTANT: the indicator ALWAYS renders when aim is active — it never
-// returns null just because drag is small.  MIN_DRAG only gates the shot
-// on release; the visual feedback starts from the first frame of aim so the
-// player always sees something and knows aim mode is active.
+// ballX/ballY and pointerX/pointerY are raw viewport pixel coordinates
+// (same space as clientX / clientY from pointer/touch events).
 //
 // Visual states:
-//   dist ≈ 0  → ring only (no direction yet)
-//   dist < MIN_DRAG → dim short arrow (shows direction, warns "too weak")
-//   dist ≥ MIN_DRAG → bright full arrow with power ring
+//   dist < 1.5 px  → ring only (finger just landed, no direction yet)
+//   dist < DEAD+5  → dim short arrow growing toward the ring edge
+//   dist ≥ DEAD+5  → bright arrow whose length encodes power
 //
-function AimIndicator({
-  bx, by, dragX, dragY,
+function AimOverlay({
+  ballX, ballY, pointerX, pointerY,
 }: {
-  bx: number; by: number;
-  dragX: number; dragY: number;
+  ballX: number; ballY: number;
+  pointerX: number; pointerY: number;
 }) {
-  const dist  = Math.sqrt(dragX * dragX + dragY * dragY);
-  const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
-  const below = dist < MIN_DRAG;
+  const dx   = pointerX - ballX;
+  const dy   = pointerY - ballY;
+  const dist = Math.hypot(dx, dy);
 
-  if (dist < 1) {
-    // No drag yet — pulse ring so player knows aim is active
+  const DEAD  = DEADZONE_SCREEN_PX;
+  const MAXD  = MAX_DRAG_SCREEN_PX;
+  const power = dist <= DEAD
+    ? 0
+    : Math.min(1, (dist - DEAD) / (MAXD - DEAD));
+  const below = dist < DEAD + 6;
+
+  const svgStyle: React.CSSProperties = {
+    position: 'fixed', inset: 0, width: '100%', height: '100%',
+    pointerEvents: 'none', zIndex: 900, overflow: 'visible',
+  };
+
+  if (dist < 1.5) {
     return (
-      <circle cx={bx} cy={by} r={BALL_R + 12}
-        fill="none" stroke="rgba(255,255,255,0.45)"
-        strokeWidth="2" strokeDasharray="5 4" />
+      <svg style={svgStyle}>
+        <circle cx={ballX} cy={ballY} r={22}
+          fill="none" stroke="rgba(255,255,255,0.52)"
+          strokeWidth="1.8" strokeDasharray="5 4" />
+      </svg>
     );
   }
 
-  const nx = -dragX / dist, ny = -dragY / dist;          // shot direction
-  const len    = below ? 28 + (dist / MIN_DRAG) * 50 : power * 170;
-  const alpha  = below ? 0.38 : 0.68;
-  const dotR   = below ? 3    : 5;
+  const nx  = -dx / dist;
+  const ny  = -dy / dist;
+  // Arrow length in screen pixels: grows 18→60 while below deadzone,
+  // then 28→168 above deadzone based on power.
+  const len   = below ? 18 + (dist / DEAD) * 42 : 28 + power * 140;
+  const alpha = below ? 0.38 : 0.74;
+  const dotR  = below ? 3 : 5;
+  const tipX  = ballX + nx * len;
+  const tipY  = ballY + ny * len;
 
   return (
-    <>
-      {/* Power ring */}
-      <circle cx={bx} cy={by} r={BALL_R + 6 + power * 20}
+    <svg style={svgStyle}>
+      {/* Power ring around ball */}
+      <circle cx={ballX} cy={ballY} r={18 + power * 10}
         fill="none"
         stroke={`rgba(255,255,255,${below ? 0.14 : 0.24})`}
         strokeWidth="1.5" strokeDasharray="5 4" />
       {/* Aim line */}
-      <line x1={bx} y1={by} x2={bx + nx * len} y2={by + ny * len}
+      <line x1={ballX} y1={ballY} x2={tipX} y2={tipY}
         stroke={`rgba(255,255,255,${alpha})`}
-        strokeWidth="2.5" strokeDasharray="11 7" strokeLinecap="round" />
+        strokeWidth={3} strokeDasharray="10 6" strokeLinecap="round" />
       {/* Tip dot */}
-      <circle cx={bx + nx * len} cy={by + ny * len}
-        r={dotR} fill={`rgba(255,255,255,${alpha - 0.1})`} />
-    </>
+      <circle cx={tipX} cy={tipY} r={dotR}
+        fill={`rgba(255,255,255,${alpha - 0.12})`} />
+    </svg>
   );
 }
 
@@ -307,24 +317,19 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   // avoids a camera-drift artifact during the spring-back animation).
   const [aimOrigin,  setAimOrigin]  = useState({ x: 50, y: 50 });
 
-  // aimAnchorRef — where the player's finger first landed (stays fixed for the whole drag).
-  // aimCurrentRef — follows the finger during the drag.
-  // Shot direction = (anchor → current) reversed; deadzone = dist(anchor, current).
-  // aimPointerIdRef — the pointerId that initiated the aim; used to ignore stray
-  //   second-finger events that would otherwise corrupt or prematurely end the aim.
-  // aimAnchorRef — set to the ball's world position when aim starts.
-  //   dragVector = aimCurrentRef − aimAnchorRef  (ball-relative drag model)
-  //   shotVector = −dragVector
-  const aimAnchorRef    = useRef<{ x: number; y: number } | null>(null);
-  // aimCurrentRef — current pointer world position (updated on every move).
-  const aimCurrentRef   = useRef<{ x: number; y: number } | null>(null);
-  // aimPointerIdRef — pointerId of the active pointer (null when in touch mode).
-  const aimPointerIdRef = useRef<number | null>(null);
-  // touchIdRef — touch.identifier of the active touch (null when in pointer mode).
-  const touchIdRef      = useRef<number | null>(null);
+  // ── Aim tracking (screen-space) ──────────────────────────────────────────
+  // All aim math uses raw viewport pixel coords (clientX/Y from events).
+  // aimBallScreenRef — ball screen pos captured at aim start (stable: ball
+  //   doesn't move on screen because zoom transform-origin = ball position).
+  // aimPointerIdRef  — pointer that started the aim (ignore others).
+  // touchIdRef       — touch.identifier for the touch fallback path.
+  const aimBallScreenRef = useRef<{ x: number; y: number } | null>(null);
+  const aimPointerIdRef  = useRef<number | null>(null);
+  const touchIdRef       = useRef<number | null>(null);
 
-  const [aimAnchor,   setAimAnchor]  = useState<{ x: number; y: number } | null>(null);
-  const [aimDisplay,  setAimDisplay] = useState<{ x: number; y: number } | null>(null);
+  // Render state — drives the AimOverlay visuals (updated every move event).
+  const [aimBallScreen,    setAimBallScreen]    = useState<{ x: number; y: number } | null>(null);
+  const [aimPointerScreen, setAimPointerScreen] = useState<{ x: number; y: number } | null>(null);
 
   // ── Debug state ───────────────────────────────────────────────────────────
   const [dbg, setDbg] = useState<DbgState>(DBG0);
@@ -409,33 +414,17 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  // ── Course coordinate mapping ─────────────────────────────────────────────
-  /**
-   * Convert a viewport pointer position → SVG / course coordinates.
-   *
-   * Calls getBoundingClientRect() live on every event — this always includes
-   * the current CSS zoom transform, so coordinates are correct whether the
-   * field is at normal scale or mid-animation.
-   *
-   * Key property: because the aim zoom transform-origin is pinned to the ball's
-   * screen position, the ball always maps to the same SVG coordinate regardless
-   * of zoom level, making the drag vector stable throughout the gesture.
-   */
-  function screenToCoursePoint(
-    clientX: number,
-    clientY: number,
-  ): { x: number; y: number } | null {
-    const svg = svgRef.current;
-    if (!svg) return null;
-    const rect         = svg.getBoundingClientRect();
-    const contentScale = Math.min(rect.width / VW, rect.height / VH);
-    const offsetX      = (rect.width  - VW * contentScale) / 2;
-    const offsetY      = (rect.height - VH * contentScale) / 2;
-    return {
-      x: (clientX - rect.left - offsetX) / contentScale,
-      y: (clientY - rect.top  - offsetY) / contentScale,
-    };
-  }
+  // ── Aim state machine ────────────────────────────────────────────────────
+  //
+  // idle → doAimStart (near ball) → aiming
+  // aiming → doAimFire (drag ≥ DEADZONE_SCREEN_PX) → rolling   [shot fired]
+  // aiming → doAimFire (drag < DEADZONE_SCREEN_PX) → idle       [tap, no shot]
+  // aiming → clearAimState (cancel/interrupt) → idle
+  //
+  // All aiming math is in screen-space (viewport pixels).  Shot direction is
+  // computed from the screen-space unit vector, which is identical to the SVG-
+  // space unit vector (both coordinate systems share the same orientation and
+  // the unit vector is scale-invariant).
 
   // ── Aim state machine ────────────────────────────────────────────────────
   //
@@ -446,13 +435,12 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
 
   /** Tear down every piece of aim state; smoothly spring zoom back to 1. */
   function clearAimState() {
-    aimAnchorRef.current    = null;
-    aimCurrentRef.current   = null;
-    aimPointerIdRef.current = null;
-    touchIdRef.current      = null;
-    setAimAnchor(null);
-    setAimDisplay(null);
-    setAimScale(1);           // smooth spring-back via CSS transition
+    aimBallScreenRef.current = null;
+    aimPointerIdRef.current  = null;
+    touchIdRef.current       = null;
+    setAimBallScreen(null);
+    setAimPointerScreen(null);
+    setAimScale(1);           // CSS transition springs zoom back to normal
     phaseRef.current = 'idle';
     setPhase('idle');
   }
@@ -465,110 +453,88 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     const svg = svgRef.current;
     if (!svg) return false;
 
-    // Current (pre-zoom) SVG layout — used for ball proximity check and for
-    // computing the zoom transform-origin.
+    // Ball proximity check in screen space.
     const rect         = svg.getBoundingClientRect();
     const contentScale = Math.min(rect.width / VW, rect.height / VH);
     const offsetX      = (rect.width  - VW * contentScale) / 2;
     const offsetY      = (rect.height - VH * contentScale) / 2;
 
-    // Ball proximity check (screen space)
     const b           = ballRef.current;
     const ballScreenX = rect.left + offsetX + b.x * contentScale;
     const ballScreenY = rect.top  + offsetY + b.y * contentScale;
     const proximity   = Math.hypot(clientX - ballScreenX, clientY - ballScreenY);
 
     if (GOLF_AIM_DEBUG) {
-      setDbg(d => ({ ...d,
+      setDbg(d => ({
+        ...d,
         phase: 'aimStart-check',
-        bWX: b.x, bWY: b.y, bSX: ballScreenX, bSY: ballScreenY,
+        bSX: ballScreenX, bSY: ballScreenY,
         pSX: clientX, pSY: clientY,
         proximity, accepted: proximity <= BALL_TAP_PX,
-        snapCS: contentScale, snapOX: offsetX, snapOY: offsetY,
-        rectW: rect.width, rectH: rect.height,
-        aimScaleAtDown: 1,
+        snapCS: contentScale, rectW: rect.width, rectH: rect.height,
+        aimZoom: 1,
       }));
     }
 
     if (proximity > BALL_TAP_PX) return false;
 
-    // ── Enter aim mode ───────────────────────────────────────────────────────
-    phaseRef.current = 'aiming';
-    setPhase('aiming');
-
-    // ── Aim zoom — gives the player more finger space, especially near edges ─
-    //
-    // Edge detection: ball within 20% of course width/height from any wall.
-    const cW  = COURSE_R - COURSE_L;
-    const cH  = COURSE_B - COURSE_T;
-    const em  = 0.20;
-    const nL  = b.x < COURSE_L + cW * em;
-    const nR  = b.x > COURSE_R - cW * em;
-    const nT  = b.y < COURSE_T + cH * em;
-    const nB  = b.y > COURSE_B - cH * em;
+    // ── Zoom out for finger space ────────────────────────────────────────────
+    // Edge detection: ball within 20% of course bounds from any wall.
+    const cW = COURSE_R - COURSE_L;
+    const cH = COURSE_B - COURSE_T;
+    const em = 0.20;
+    const nL = b.x < COURSE_L + cW * em;
+    const nR = b.x > COURSE_R - cW * em;
+    const nT = b.y < COURSE_T + cH * em;
+    const nB = b.y > COURSE_B - cH * em;
     const nearCorner = (nL || nR) && (nT || nB);
     const nearEdge   = nL || nR || nT || nB;
-    const aimZoomScale = nearCorner ? 0.65 : nearEdge ? 0.72 : 0.80;
+    // Stronger zoom-out than before: 0.52 / 0.60 / 0.68
+    const aimZoomScale = nearCorner ? 0.52 : nearEdge ? 0.60 : 0.68;
 
-    // Transform-origin = ball's position in the field div, expressed as %.
-    // Scaling from this point keeps the ball pixel-stationary during zoom, so
-    // a stationary finger on the ball correctly maps to drag = 0.
-    const ballInFieldX = offsetX + b.x * contentScale;   // px from field-div left
-    const ballInFieldY = offsetY + b.y * contentScale;   // px from field-div top
+    // Transform-origin = ball's screen position as % of field div.
+    // Keeps ball pixel-stationary during zoom so the AimOverlay ball coords
+    // remain valid throughout the gesture.
+    const ballInFieldX = offsetX + b.x * contentScale;
+    const ballInFieldY = offsetY + b.y * contentScale;
     const originX = Math.max(10, Math.min(90, (ballInFieldX / rect.width)  * 100));
     const originY = Math.max(10, Math.min(90, (ballInFieldY / rect.height) * 100));
 
     setAimScale(aimZoomScale);
     setAimOrigin({ x: originX, y: originY });
 
-    // Ball-relative drag model:
-    //   anchor  = ball world position (FIXED for the whole gesture)
-    //   current = pointer world position (updates on move)
-    //   dragVector = current − anchor = pointerWorld − ballWorld
-    //   shotVector = −dragVector
-    //
-    // This means the arrow appears immediately (direction = ball→finger),
-    // and dist=0 only when finger is exactly on ball centre.
-    const initialPt = screenToCoursePoint(clientX, clientY) ?? { x: b.x, y: b.y };
-    aimAnchorRef.current  = { x: b.x, y: b.y };
-    aimCurrentRef.current = initialPt;
-    setAimAnchor({ x: b.x, y: b.y });
-    setAimDisplay(initialPt);
+    // Store ball screen position (stable — ball stays at same pixel during zoom).
+    aimBallScreenRef.current = { x: ballScreenX, y: ballScreenY };
+    setAimBallScreen({ x: ballScreenX, y: ballScreenY });
+    setAimPointerScreen({ x: clientX, y: clientY });
+
+    phaseRef.current = 'aiming';
+    setPhase('aiming');
 
     if (GOLF_AIM_DEBUG) {
-      const dragX = initialPt.x - b.x, dragY = initialPt.y - b.y;
-      setDbg(d => ({ ...d,
-        phase: 'aiming',
-        aWX: b.x, aWY: b.y,
-        pWX: initialPt.x, pWY: initialPt.y,
-        dragX, dragY, shotX: -dragX, shotY: -dragY,
-        dragDist: Math.hypot(dragX, dragY),
-        power: Math.min(Math.hypot(dragX, dragY), MAX_DRAG) / MAX_DRAG,
+      setDbg(d => ({
+        ...d, phase: 'aiming',
+        aimZoom: aimZoomScale, arrowVis: true,
+        dragDist: Math.hypot(clientX - ballScreenX, clientY - ballScreenY),
+        power: 0,
       }));
     }
 
     return true;
   }
 
-  /** Update the aim line position during a drag. */
+  /** Update the aim overlay position during a drag. */
   function doAimMove(clientX: number, clientY: number) {
     if (phaseRef.current !== 'aiming') return;
-    const pt = screenToCoursePoint(clientX, clientY);
-    if (!pt) return;
-    aimCurrentRef.current = pt;
-    setAimDisplay(pt);
+    setAimPointerScreen({ x: clientX, y: clientY });
 
     if (GOLF_AIM_DEBUG) {
-      const anchor = aimAnchorRef.current;
-      if (anchor) {
-        const dragX   = pt.x - anchor.x, dragY = pt.y - anchor.y;
-        const dragDist = Math.hypot(dragX, dragY);
-        setDbg(d => ({ ...d,
-          pSX: clientX, pSY: clientY,
-          pWX: pt.x,    pWY: pt.y,
-          dragX, dragY, shotX: -dragX, shotY: -dragY,
-          dragDist, power: Math.min(dragDist, MAX_DRAG) / MAX_DRAG,
-        }));
+      const bs = aimBallScreenRef.current;
+      if (bs) {
+        const dragDist = Math.hypot(clientX - bs.x, clientY - bs.y);
+        const power = Math.min(1, Math.max(0,
+          (dragDist - DEADZONE_SCREEN_PX) / (MAX_DRAG_SCREEN_PX - DEADZONE_SCREEN_PX)));
+        setDbg(d => ({ ...d, pSX: clientX, pSY: clientY, dragDist, power, arrowVis: true }));
       }
     }
   }
@@ -577,46 +543,37 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
   function doAimFire(clientX: number, clientY: number) {
     if (phaseRef.current !== 'aiming') return;
 
-    const anchor  = aimAnchorRef.current;
-    // Use the exact release position; fall back to last tracked position
-    const current = screenToCoursePoint(clientX, clientY) ?? aimCurrentRef.current;
-    const b       = ballRef.current;
+    const ballSc = aimBallScreenRef.current;
+    const b      = ballRef.current;
 
-    // Get live contentScale BEFORE clearAimState() queues the aimScale reset.
-    // React batches state updates, so the DOM is still zoomed right now and
-    // getBoundingClientRect() returns the current (zoomed) rect — which is
-    // exactly what we need for a consistent svgDist → screenDist conversion.
-    const svgEl  = svgRef.current;
-    const livecs = svgEl ? (() => {
-      const r = svgEl.getBoundingClientRect();
-      return Math.min(r.width / VW, r.height / VH);
-    })() : 0.65;
+    clearAimState();   // hide overlay & spring zoom back BEFORE early returns
 
-    clearAimState();   // reset visuals & zoom BEFORE early-returns
+    if (!ballSc) return;
 
-    if (!anchor || !current) return;
+    // Pure screen-space drag — no SVG coordinate conversion needed.
+    // The shot unit vector is scale-invariant (same in screen px and SVG units).
+    const dx   = clientX - ballSc.x;   // screen drag x
+    const dy   = clientY - ballSc.y;   // screen drag y
+    const dist = Math.hypot(dx, dy);
 
-    const dx      = current.x - anchor.x;   // dragVector.x (ball-relative, SVG units)
-    const dy      = current.y - anchor.y;   // dragVector.y
-    const svgDist = Math.sqrt(dx * dx + dy * dy);
-
-    // Convert drag distance to screen pixels for deadzone + power calculation.
-    // Using the current (zoomed) contentScale gives the true screen distance.
-    const cs          = livecs;
-    const screenDist  = svgDist * cs;
-
-    if (screenDist < DEADZONE_SCREEN_PX) {
-      if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'cancelled-deadzone' }));
-      return;    // tap without meaningful drag — do not shoot
+    if (dist < DEADZONE_SCREEN_PX) {
+      if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'cancelled-deadzone', arrowVis: false }));
+      return;   // tap / accidental touch — no shot
     }
 
-    if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'fired' }));
+    if (GOLF_AIM_DEBUG) setDbg(d => ({ ...d, phase: 'fired', arrowVis: false }));
 
-    const power = Math.min(screenDist, MAX_DRAG_SCREEN_PX) / MAX_DRAG_SCREEN_PX;
+    // Shot direction = opposite of drag (pull-back model).
+    // Unit vector is the same in screen space and SVG space.
+    const nx = -dx / dist;
+    const ny = -dy / dist;
+    // Power: linear from 0 at deadzone edge to 1 at maxDrag
+    const power = Math.min(1, Math.max(0,
+      (dist - DEADZONE_SCREEN_PX) / (MAX_DRAG_SCREEN_PX - DEADZONE_SCREEN_PX)));
     const speed = power * MAX_SPEED;
+
     prevBallPosRef.current = { x: b.x, y: b.y };
-    // Shot direction = OPPOSITE of drag direction  (classic pull-back model)
-    ballRef.current = { ...b, vx: (-dx / svgDist) * speed, vy: (-dy / svgDist) * speed };
+    ballRef.current = { ...b, vx: nx * speed, vy: ny * speed };
     playGolfSwing(power);
 
     const newShots = shotsRef.current + 1;
@@ -655,11 +612,10 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
     clearAimState();
   }
 
-  function handlePointerLeave(e: React.PointerEvent<SVGSVGElement>) {
-    if (phaseRef.current === 'aiming' && e.pointerId === aimPointerIdRef.current) {
-      clearAimState();
-    }
-  }
+  // NOTE: No handlePointerLeave — the player regularly drags outside the zoomed
+  // SVG element while aiming.  pointercancel handles genuine hardware cancels.
+  // Removing this was a key fix: previously it killed aim the moment the finger
+  // reached the edge of the smaller zoomed SVG.
 
   // ── Touch event handlers (fallback / belt-and-suspenders) ────────────────
   //
@@ -770,7 +726,6 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
-          onPointerLeave={handlePointerLeave}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -867,14 +822,7 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
               stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="5 4" />
           )}
 
-          {/* Aim indicator — always renders while aiming, even before drag */}
-          {phase === 'aiming' && aimAnchor && (
-            <AimIndicator
-              bx={ballPos.x} by={ballPos.y}
-              dragX={(aimDisplay?.x ?? aimAnchor.x) - aimAnchor.x}
-              dragY={(aimDisplay?.y ?? aimAnchor.y) - aimAnchor.y}
-            />
-          )}
+          {/* Aim arrow rendered in screen-space overlay outside this SVG — see below */}
 
           {/* Ball shadow — not rotating */}
           {phase !== 'sunk' && (
@@ -935,38 +883,13 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
             const cs = dbg.snapCS || 1;
             return (
               <g style={{ pointerEvents: 'none' }}>
-                {/* Yellow dashed circle = BALL_TAP_PX proximity zone */}
+                {/* Yellow dashed circle = BALL_TAP_PX hit zone */}
                 <circle cx={ballPos.x} cy={ballPos.y} r={BALL_TAP_PX / cs}
                   fill="none" stroke="rgba(255,220,0,0.5)" strokeWidth="1.5"
                   strokeDasharray="8 5" />
-                {/* Red dot = ball centre (should be exactly under the white ball) */}
+                {/* Red dot = ball SVG centre */}
                 <circle cx={ballPos.x} cy={ballPos.y} r={5}
                   fill="rgba(255,40,40,0.9)" />
-                {/* MIN_DRAG deadzone circle around anchor */}
-                {phase === 'aiming' && (
-                  <circle cx={dbg.aWX} cy={dbg.aWY} r={MIN_DRAG}
-                    fill="none" stroke="rgba(255,100,255,0.55)" strokeWidth="1.5"
-                    strokeDasharray="4 4" />
-                )}
-                {/* Cyan dot = pointer world position */}
-                {phase === 'aiming' && (
-                  <circle cx={dbg.pWX} cy={dbg.pWY} r={7}
-                    fill="rgba(0,255,220,0.85)" />
-                )}
-                {/* Orange dashed line = drag vector (anchor → current pointer) */}
-                {phase === 'aiming' && dbg.dragDist > 0 && (
-                  <line x1={dbg.aWX} y1={dbg.aWY} x2={dbg.pWX} y2={dbg.pWY}
-                    stroke="rgba(255,160,0,0.8)" strokeWidth="2.5"
-                    strokeDasharray="7 5" strokeLinecap="round" />
-                )}
-                {/* Blue solid line = shot vector (from ball, opposite of drag) */}
-                {phase === 'aiming' && dbg.dragDist >= MIN_DRAG && (
-                  <line x1={ballPos.x} y1={ballPos.y}
-                        x2={ballPos.x + (dbg.shotX / dbg.dragDist) * Math.min(dbg.dragDist, MAX_DRAG) * 1.0}
-                        y2={ballPos.y + (dbg.shotY / dbg.dragDist) * Math.min(dbg.dragDist, MAX_DRAG) * 1.0}
-                    stroke="rgba(80,160,255,0.9)" strokeWidth="3"
-                    strokeLinecap="round" />
-                )}
               </g>
             );
           })()}
@@ -977,6 +900,16 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
           {phase === 'idle' && 'Touch ball · drag to aim · release to shoot'}
         </div>
       </div>
+
+      {/* ── Aim overlay (screen-space, position:fixed — immune to map zoom) ── */}
+      {phase === 'aiming' && aimBallScreen && aimPointerScreen && (
+        <AimOverlay
+          ballX={aimBallScreen.x}
+          ballY={aimBallScreen.y}
+          pointerX={aimPointerScreen.x}
+          pointerY={aimPointerScreen.y}
+        />
+      )}
 
       {/* KRONE hole-in-one overlay */}
       <KroneOverlay active={showKrone} />
@@ -997,15 +930,13 @@ export default function GolfGameScreen({ course, courseIndex, onComplete, onHome
         }}>
           {[
             `── GOLF AIM DEBUG ──────────────────────────────────`,
-            `phase: ${dbg.phase}   isAiming: ${phase === 'aiming'}   ptId: ${dbg.ptId ?? '–'}   touchId: ${touchIdRef.current ?? '–'}`,
-            `ballW  (${dbg.bWX.toFixed(0)}, ${dbg.bWY.toFixed(0)})    ballS  (${dbg.bSX.toFixed(0)}, ${dbg.bSY.toFixed(0)})`,
-            `ptrS   (${dbg.pSX.toFixed(0)}, ${dbg.pSY.toFixed(0)})    ptrW   (${dbg.pWX.toFixed(1)}, ${dbg.pWY.toFixed(1)})`,
-            `proximity ${dbg.proximity.toFixed(1)} px  tapPx ${BALL_TAP_PX}  accepted: ${dbg.accepted}`,
-            `snap   CS ${dbg.snapCS.toFixed(3)}   oX ${dbg.snapOX.toFixed(1)}   oY ${dbg.snapOY.toFixed(1)}`,
-            `svgRect  ${dbg.rectW.toFixed(0)} × ${dbg.rectH.toFixed(0)}  aimScaleAtDown ${dbg.aimScaleAtDown.toFixed(2)}`,
-            `anchor (${dbg.aWX.toFixed(1)}, ${dbg.aWY.toFixed(1)})`,
-            `drag   (${dbg.dragX.toFixed(1)}, ${dbg.dragY.toFixed(1)})   dist ${dbg.dragDist.toFixed(1)}   minDrag ${MIN_DRAG}`,
-            `shot   (${dbg.shotX.toFixed(1)}, ${dbg.shotY.toFixed(1)})   power ${(dbg.power * 100).toFixed(0)}%   maxDrag ${MAX_DRAG}`,
+            `phase: ${dbg.phase}   isAiming: ${phase === 'aiming'}   arrowVis: ${dbg.arrowVis}`,
+            `input  ptId ${aimPointerIdRef.current ?? '–'}   touchId ${touchIdRef.current ?? '–'}`,
+            `ballS  (${dbg.bSX.toFixed(0)}, ${dbg.bSY.toFixed(0)})   ptrS (${dbg.pSX.toFixed(0)}, ${dbg.pSY.toFixed(0)})`,
+            `proximity ${dbg.proximity.toFixed(1)} px   tapPx ${BALL_TAP_PX}   accepted: ${dbg.accepted}`,
+            `svgRect  ${dbg.rectW.toFixed(0)} × ${dbg.rectH.toFixed(0)}   CS ${dbg.snapCS.toFixed(3)}`,
+            `dragDist ${dbg.dragDist.toFixed(1)} px   dead ${DEADZONE_SCREEN_PX}   max ${MAX_DRAG_SCREEN_PX}`,
+            `power    ${(dbg.power * 100).toFixed(0)}%   zoomScale ${dbg.aimZoom.toFixed(2)}`,
           ].join('\n')}
         </div>
       )}
